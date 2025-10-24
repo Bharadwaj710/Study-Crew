@@ -4,6 +4,7 @@ import LandingNavbar from '../components/LandingNavbar'
 import FeatureCard from '../components/FeatureCard'
 import Testimonial from '../components/Testimonial'
 import Footer from '../components/Footer'
+import { Link } from 'react-router-dom';
 
 export default function LandingPage() {
   return (
@@ -17,8 +18,12 @@ export default function LandingPage() {
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">Study Together. Grow Faster.</h1>
             <p className="mt-4 text-lg text-gray-600">Form study groups, set goals, and achieve them together.</p>
             <div className="mt-8 flex items-center gap-4">
-              <a href="#signup" className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-lg shadow-lg hover:scale-105 transition-transform">Get Started</a>
-              <a href="#features" className="text-sm text-gray-600 underline">See features</a>
+<Link
+            to="/register"
+            className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Register
+          </Link>              <a href="#features" className="text-sm text-gray-600 underline">See features</a>
             </div>
           </motion.div>
 
