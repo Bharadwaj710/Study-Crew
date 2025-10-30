@@ -1,11 +1,116 @@
 import Group from "../models/group.model.js";
+import User from "../models/user.model.js";
+import Invitation from "../models/invitation.model.js";
 
-export async function createGroup(req, res) {
-  console.log("createGroup", req.body);
-  res.json({ message: "create group placeholder" });
-}
+// Create group
+export const createGroup = async (req, res) => {
+  try {
+    const { name, type, goal, privacy, invitedMembers } = req.body;
 
-export async function getGroup(req, res) {
-  console.log("getGroup", req.params.id);
-  res.json({ message: "get group placeholder" });
-}
+    if (!name || !type || !goal) {
+      return res
+        .status(400)
+        .json({ message: "Name, type, and goal are required" });
+    }
+
+    const group = new Group({
+      name,
+      type,
+      goal,
+      privacy: privacy || "public",
+      creator: req.user.id,
+      members: [req.user.id],
+      pendingInvites: invitedMembers || [],
+    });
+
+    await group.save();
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $push: { joinedGroups: group._id },
+    });
+
+    if (invitedMembers && invitedMembers.length > 0) {
+      const invitations = invitedMembers.map((memberId) => ({
+        sender: req.user.id,
+        recipient: memberId,
+        group: group._id,
+        message: `You've been invited to join ${name}`,
+      }));
+      await Invitation.insertMany(invitations);
+    }
+
+    res.status(201).json({ message: "Group created successfully", group });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get all groups
+export const getGroups = async (req, res) => {
+  try {
+    const groups = await Group.find({
+      $or: [{ privacy: "public" }, { members: req.user.id }],
+    })
+      .populate("creator", "name email avatar")
+      .populate("members", "name avatar")
+      .sort({ createdAt: -1 });
+
+    res.json({ groups });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get single group
+export const getGroupById = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id)
+      .populate("creator", "name email avatar")
+      .populate("members", "name email avatar skills interests");
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isMember = group.members.some(
+      (member) => member._id.toString() === req.user.id
+    );
+
+    if (group.privacy === "private" && !isMember) {
+      return res
+        .status(403)
+        .json({ message: "You do not have access to this group" });
+    }
+
+    res.json({ group });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Join group
+export const joinGroup = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    if (group.members.includes(req.user.id))
+      return res.status(400).json({ message: "Already a member" });
+
+    if (group.privacy === "private")
+      return res
+        .status(403)
+        .json({ message: "This is a private group. You need an invitation." });
+
+    group.members.push(req.user.id);
+    await group.save();
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $push: { joinedGroups: group._id },
+    });
+
+    res.json({ message: "Successfully joined the group", group });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

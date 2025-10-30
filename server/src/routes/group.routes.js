@@ -1,9 +1,17 @@
 import express from "express";
-import { createGroup, getGroup } from "../controllers/group.controller.js";
+import {
+  createGroup,
+  getGroups,
+  getGroupById,
+  joinGroup,
+} from "../controllers/group.controller.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", createGroup);
-router.get("/:id", getGroup);
+router.post("/", protect, createGroup);
+router.get("/", protect, getGroups);
+router.get("/:id", protect, getGroupById);
+router.post("/:id/join", protect, joinGroup);
 
 export default router;

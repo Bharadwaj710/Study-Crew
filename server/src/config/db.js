@@ -3,10 +3,13 @@ import { MONGO_URI } from "./env.js";
 
 export async function connectDB() {
   try {
-    await mongoose.connect(MONGO_URI);
-    console.log("MongoDB connected");
+    const conn = await mongoose.connect(MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (err) {
-    console.error("MongoDB connection error", err);
-    throw err;
+    console.error("MongoDB connection error:", err.message);
+    process.exit(1);
   }
 }

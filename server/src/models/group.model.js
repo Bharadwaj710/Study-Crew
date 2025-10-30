@@ -1,12 +1,51 @@
 import mongoose from "mongoose";
 
-const GroupSchema = new mongoose.Schema(
+const groupSchema = new mongoose.Schema(
   {
-    title: String,
-    description: String,
-    members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    type: {
+      type: String,
+      enum: ["study", "hackathon"],
+      required: true,
+    },
+    goal: {
+      type: String,
+      required: true,
+    },
+    privacy: {
+      type: String,
+      enum: ["public", "private"],
+      default: "public",
+    },
+    creator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    pendingInvites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    description: {
+      type: String,
+      default: "",
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-export default mongoose.model("Group", GroupSchema);
+export default mongoose.model("Group", groupSchema);

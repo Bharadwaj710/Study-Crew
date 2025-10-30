@@ -1,27 +1,85 @@
 import mongoose from "mongoose";
 
-const UserSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Name is required"],
+      required: true,
       trim: true,
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: true,
       unique: true,
-      trim: true,
       lowercase: true,
-      match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
-      minlength: [6, "Password should be at least 6 characters"],
+      required: true,
+    },
+    avatar: {
+      type: String,
+      default: "https://ui-avatars.com/api/?background=random",
+    },
+    about: {
+      type: String,
+      default: "",
+    },
+    education: {
+      college: {
+        type: String,
+        default: "",
+      },
+      degree: {
+        type: String,
+        default: "",
+      },
+      year: {
+        type: String,
+        default: "",
+      },
+      major: {
+        type: String,
+        default: "",
+      },
+    },
+    interests: [
+      {
+        type: String,
+      },
+    ],
+    skills: [
+      {
+        type: String,
+      },
+    ],
+    joinedGroups: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Group",
+      },
+    ],
+    isProfileComplete: {
+      type: Boolean,
+      default: false,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-export default mongoose.model("User", UserSchema);
+// Method to check profile completion
+userSchema.methods.checkProfileCompletion = function () {
+  return !!(
+    this.name &&
+    this.email &&
+    this.about &&
+    this.education.college &&
+    this.education.degree &&
+    this.interests.length > 0 &&
+    this.skills.length > 0
+  );
+};
+
+export default mongoose.model("User", userSchema);
