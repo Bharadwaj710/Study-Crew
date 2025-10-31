@@ -43,11 +43,18 @@ const userSchema = new mongoose.Schema(
         default: "",
       },
     },
-    interests: [
+    interests: [String],
+    skills: [String],
+    joinedGroups: [
       {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Group",
       },
     ],
+    isProfileComplete: {
+      type: Boolean,
+      default: false,
+    },
     skills: [
       {
         type: String,
@@ -68,6 +75,19 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+userSchema.methods.checkProfileCompletion = function () {
+  return !!(
+    this.name &&
+    this.about &&
+    this.education.college &&
+    this.education.degree &&
+    this.education.year &&
+    this.education.major &&
+    this.interests.length > 0 &&
+    this.skills.length > 0
+  );
+};
 
 // Method to check profile completion
 userSchema.methods.checkProfileCompletion = function () {

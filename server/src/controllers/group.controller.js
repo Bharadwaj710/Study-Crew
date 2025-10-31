@@ -5,12 +5,15 @@ import Invitation from "../models/invitation.model.js";
 // Create group
 export const createGroup = async (req, res) => {
   try {
-    const { name, type, goal, privacy, invitedMembers } = req.body;
+    const { name, type, goal, privacy, invitedMembers = [], description } = req.body;
 
     if (!name || !type || !goal) {
-      return res
-        .status(400)
-        .json({ message: "Name, type, and goal are required" });
+      return res.status(400).json({ message: "Name, type, and goal are required" });
+    }
+
+    const creator = await User.findById(req.user.userId);
+    if (!creator) {
+      return res.status(404).json({ message: "Creator not found" });
     }
 
     const group = new Group({
@@ -18,29 +21,33 @@ export const createGroup = async (req, res) => {
       type,
       goal,
       privacy: privacy || "public",
-      creator: req.user.id,
-      members: [req.user.id],
-      pendingInvites: invitedMembers || [],
+      creator: req.user.userId,
+      members: [req.user.userId], // Only creator as member
+      description: description || "",
+      pendingInvites: [] // empty or omit
     });
 
     await group.save();
 
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(req.user.userId, {
       $push: { joinedGroups: group._id },
     });
 
-    if (invitedMembers && invitedMembers.length > 0) {
-      const invitations = invitedMembers.map((memberId) => ({
-        sender: req.user.id,
+    // Create invitations separately
+    if (invitedMembers.length > 0) {
+      const invitations = invitedMembers.map(memberId => ({
+        sender: req.user.userId,
         recipient: memberId,
         group: group._id,
         message: `You've been invited to join ${name}`,
       }));
+
       await Invitation.insertMany(invitations);
     }
 
     res.status(201).json({ message: "Group created successfully", group });
   } catch (error) {
+    console.error("Create group error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

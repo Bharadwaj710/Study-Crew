@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  FaPlus,
-  FaSearch,
-  FaUsers,
-  FaArrowRight,
-} from "react-icons/fa";
+import { FaPlus, FaSearch, FaUsers, FaArrowRight } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import { userAPI, groupAPI } from "../services/api";
@@ -23,7 +18,9 @@ const Dashboard = () => {
 
   const fetchUserAndGroups = async () => {
     try {
+      // Fetch user profile
       const userResponse = await userAPI.getProfile();
+      console.log("User profile response:", userResponse.data);
       setUser(userResponse.data.user);
 
       if (!userResponse.data.isProfileComplete) {
@@ -35,12 +32,19 @@ const Dashboard = () => {
         );
       }
 
+      // Fetch groups
       const groupsResponse = await groupAPI.getGroups();
-      setGroups(groupsResponse.data.groups);
+      console.log("Groups response:", groupsResponse.data);
+      setGroups(groupsResponse.data.groups || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load dashboard");
+      console.error(
+        "Error fetching data:",
+        error.response?.data || error.message
+      );
+      const errorMessage =
+        error.response?.data?.message || "Failed to load dashboard";
+      toast.error(errorMessage);
       setLoading(false);
     }
   };

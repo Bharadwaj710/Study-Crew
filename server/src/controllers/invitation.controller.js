@@ -26,39 +26,24 @@ export const getInvitations = async (req, res) => {
 export const acceptInvitation = async (req, res) => {
   try {
     const invitation = await Invitation.findById(req.params.id);
-
-    if (!invitation) {
-      return res.status(404).json({ message: "Invitation not found" });
-    }
-
-    // Verify recipient
-    if (invitation.recipient.toString() !== req.user.id) {
+    if (!invitation) return res.status(404).json({ message: "Invitation not found" });
+    if (invitation.recipient.toString() !== req.user.userId)
       return res.status(403).json({ message: "Unauthorized" });
-    }
 
-    // Update invitation status
     invitation.status = "accepted";
     await invitation.save();
 
-    // Add user to group
     const group = await Group.findById(invitation.group);
-    if (!group.members.includes(req.user.id)) {
-      group.members.push(req.user.id);
-      group.pendingInvites = group.pendingInvites.filter(
-        (id) => id.toString() !== req.user.id
-      );
+    if (!group.members.includes(req.user.userId)) {
+      group.members.push(req.user.userId);
       await group.save();
     }
 
-    // Add group to user's joined groups
-    await User.findByIdAndUpdate(req.user.id, {
-      $addToSet: { joinedGroups: invitation.group },
+    await User.findByIdAndUpdate(req.user.userId, {
+      $addToSet: { joinedGroups: invitation.group }
     });
 
-    res.json({
-      message: "Invitation accepted successfully",
-      group,
-    });
+    res.json({ message: "Invitation accepted", group });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

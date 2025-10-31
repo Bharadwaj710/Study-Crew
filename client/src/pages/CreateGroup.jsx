@@ -85,11 +85,17 @@ const CreateGroup = () => {
   const handleCreateGroup = async () => {
     setLoading(true);
     try {
-      await groupAPI.createGroup(formData);
+      console.log("Sending group data:", formData);
+      const response = await groupAPI.createGroup(formData);
+      console.log("Group created:", response.data);
       toast.success("🎉 Group created successfully! Invitations sent.");
       navigate("/dashboard");
     } catch (error) {
-      toast.error("Failed to create group");
+      console.error(
+        "Group creation error:",
+        error.response?.data || error.message
+      );
+      toast.error(error.response?.data?.message || "Failed to create group");
       setLoading(false);
     }
   };

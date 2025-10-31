@@ -23,6 +23,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error("API Error:", error);
+    if (error.response?.status === 401) {
+      // Clear stored data on auth error
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      // Reload the page to reset the app state
+      window.location.href = "/login";
+    }
     throw error;
   }
 );
@@ -52,7 +59,10 @@ export const userAPI = {
 
 // Group API
 export const groupAPI = {
-  createGroup: (data) => api.post("/groups", data),
+  createGroup: (data) => {
+    console.log("Making POST request to /groups with data:", data);
+    return api.post("/groups", data);
+  },
   getGroups: () => api.get("/groups"),
   getGroupById: (id) => api.get(`/groups/${id}`),
   joinGroup: (id) => api.post(`/groups/${id}/join`),

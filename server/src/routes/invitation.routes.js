@@ -4,7 +4,7 @@ import {
   getInvitations,
   acceptInvitation,
   declineInvitation,
-} from "../controllers/invitaion.controller.js";
+} from "../controllers/invitation.controller.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();

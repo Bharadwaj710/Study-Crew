@@ -2,7 +2,8 @@ import User from "../models/user.model.js";
 // Get current user profile
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
+    console.log("User in request:", req.user);
+    const user = await User.findById(req.user.userId)
       .select("-password")
       .populate("joinedGroups", "name type privacy");
 
@@ -24,7 +25,7 @@ export const updateProfile = async (req, res) => {
   try {
     const { name, about, education, interests, skills, avatar } = req.body;
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.userId);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

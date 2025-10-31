@@ -33,6 +33,29 @@ export async function register(req, res) {
   }
 }
 
+export async function verifyToken(req, res) {
+  try {
+    // Since we're using the protect middleware, if we get here the token is valid
+    // and req.user contains the decoded token payload
+    const user = await User.findById(req.user.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(500).json({ message: "Could not verify token" });
+  }
+}
+
 export async function login(req, res) {
   try {
     const { email, password } = req.body;
@@ -40,7 +63,7 @@ export async function login(req, res) {
     // log successful logins to the terminal after the response is finished
     res.on("finish", () => {
       if (res.statusCode === 200 && user) {
-      console.log(`User logged in: ${user.email}`);
+        console.log(`User logged in: ${user.email}`);
       }
     });
     if (!user) {

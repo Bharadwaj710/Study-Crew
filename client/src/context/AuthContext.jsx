@@ -8,13 +8,31 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved token and user data on mount
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const verifyAuth = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        // Verify token and get fresh user data
+        const { data } = await api.get("/auth/verify");
+        setUser(data.user);
+      } catch (error) {
+        console.error("Auth verification failed:", error);
+        // Only clear auth if it's an auth error (401) or server can't be reached
+        if (error.response?.status === 401 || !error.response) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifyAuth();
   }, []);
 
   const login = async (email, password) => {
