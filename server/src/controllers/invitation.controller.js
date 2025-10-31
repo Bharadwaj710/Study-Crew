@@ -6,7 +6,7 @@ import User from "../models/user.model.js";
 export const getInvitations = async (req, res) => {
   try {
     const invitations = await Invitation.find({
-      recipient: req.user.id,
+      recipient: req.user.userId,
       status: "pending",
     })
       .populate("sender", "name email avatar")
@@ -26,24 +26,26 @@ export const getInvitations = async (req, res) => {
 export const acceptInvitation = async (req, res) => {
   try {
     const invitation = await Invitation.findById(req.params.id);
-    if (!invitation) return res.status(404).json({ message: "Invitation not found" });
-    if (invitation.recipient.toString() !== req.user.userId)
-      return res.status(403).json({ message: "Unauthorized" });
+if (!invitation) return res.status(404).json({ message: "Invitation not found" });
+if (invitation.recipient.toString() !== req.user.userId) return res.status(403).json({ message: "Unauthorized" });
 
-    invitation.status = "accepted";
-    await invitation.save();
+invitation.status = "accepted";
+await invitation.save();
 
-    const group = await Group.findById(invitation.group);
-    if (!group.members.includes(req.user.userId)) {
-      group.members.push(req.user.userId);
-      await group.save();
-    }
+const group = await Group.findById(invitation.group);
+if (!group.members.includes(req.user.userId)) {
+  group.members.push(req.user.userId);
+  // Clean pending invites
+  group.pendingInvites = group.pendingInvites.filter(id => id.toString() !== req.user.userId);
+  await group.save();
+}
 
-    await User.findByIdAndUpdate(req.user.userId, {
-      $addToSet: { joinedGroups: invitation.group }
-    });
+await User.findByIdAndUpdate(req.user.userId, {
+  $addToSet: { joinedGroups: invitation.group },
+});
 
-    res.json({ message: "Invitation accepted", group });
+res.json({ message: "Invitation accepted", group });
+
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -58,7 +60,7 @@ export const declineInvitation = async (req, res) => {
       return res.status(404).json({ message: "Invitation not found" });
     }
 
-    if (invitation.recipient.toString() !== req.user.id) {
+    if (invitation.recipient.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
