@@ -1,9 +1,24 @@
 import React, { useState } from "react";
-import { FaTimes, FaPlus, FaMinus } from "react-icons/fa";
+import { FaTimes, FaPlus, FaCheck } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { taskAPI } from "../services/api";
 
-const TaskModal = ({ groupId, group, onClose }) => {
+const COLORS = [
+  "#EF4444", // red
+  "#F97316", // orange
+  "#EAB308", // yellow
+  "#22C55E", // green
+  "#06B6D4", // cyan/teal
+  "#3B82F6", // blue
+  "#6366F1", // indigo
+  "#8B5CF6", // violet
+  "#EC4899", // pink
+  "#D946EF", // magenta
+  "#6B7280", // gray
+  "#111827", // black
+];
+
+const TaskModal = ({ groupId, group, onClose, onTaskCreated }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("binary");
@@ -11,6 +26,8 @@ const TaskModal = ({ groupId, group, onClose }) => {
   const [targetValue, setTargetValue] = useState(1);
   const [assigned, setAssigned] = useState([]);
   const [deadline, setDeadline] = useState("");
+  const [tempDeadline, setTempDeadline] = useState("");
+  const [selectedColor, setSelectedColor] = useState(COLORS[5]); // default blue
   const [loading, setLoading] = useState(false);
 
   const handleToggleMember = (memberId) => {
@@ -30,7 +47,7 @@ const TaskModal = ({ groupId, group, onClose }) => {
 
     setLoading(true);
     try {
-      await taskAPI.createTask(groupId, {
+      const payload = {
         title,
         description,
         type,
@@ -38,14 +55,38 @@ const TaskModal = ({ groupId, group, onClose }) => {
         targetValue: parseInt(targetValue),
         assigned,
         deadline: deadline ? new Date(deadline).toISOString() : null,
-      });
-      toast.success("Task created!");
-      onClose();
+        color: selectedColor,
+      };
+
+      const res = await taskAPI.createTask(groupId, payload);
+      const newTask = res?.data?.task;
+      if (res?.data?.success && newTask) {
+        toast.success("Task created successfully");
+        // Immediately update local UI if callback provided
+        if (onTaskCreated) onTaskCreated(newTask);
+        onClose();
+      } else {
+        throw new Error(res?.data?.message || "Failed to create task");
+      }
     } catch (error) {
-      toast.error("Failed to create task");
+      console.error("Failed to create task:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to create task"
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyTempDeadline = () => {
+    setDeadline(tempDeadline);
+    setTempDeadline("");
+  };
+
+  const cancelTempDeadline = () => {
+    setTempDeadline("");
   };
 
   return (
@@ -109,12 +150,74 @@ const TaskModal = ({ groupId, group, onClose }) => {
             </>
           )}
 
-          <input
-            type="datetime-local"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-          />
+          <div>
+            <label className="text-sm font-semibold text-gray-700">
+              Deadline
+            </label>
+            <input
+              type="datetime-local"
+              value={tempDeadline}
+              onChange={(e) => setTempDeadline(e.target.value)}
+              className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+            />
+            {tempDeadline && (
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={applyTempDeadline}
+                  className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm"
+                >
+                  OK
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelTempDeadline}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {deadline && (
+              <p className="text-gray-600 text-sm mt-2">
+                Deadline: {new Date(deadline).toLocaleString()}
+              </p>
+            )}
+          </div>
+
+          {/* Task Color Picker */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">
+              Task Color
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {COLORS.map((col) => (
+                <button
+                  type="button"
+                  key={col}
+                  onClick={() => setSelectedColor(col)}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                    selectedColor === col
+                      ? "ring-2 ring-offset-1 ring-indigo-400"
+                      : ""
+                  }`}
+                  style={{ backgroundColor: col }}
+                  title={col}
+                >
+                  {selectedColor === col && (
+                    <FaCheck className="text-white text-xs" />
+                  )}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Selected color preview:
+            </p>
+            <div
+              className="w-12 h-6 rounded mt-1"
+              style={{ backgroundColor: selectedColor }}
+            />
+          </div>
 
           {/* Members */}
           <div>

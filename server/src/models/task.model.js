@@ -6,6 +6,10 @@ const taskSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    color: {
+      type: String,
+      default: "#3B82F6", // Tailwind indigo-500 as default
+    },
     description: {
       type: String,
       default: "",

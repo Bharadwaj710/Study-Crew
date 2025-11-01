@@ -53,7 +53,9 @@ const GroupDetail = () => {
 
     // Listen for real-time updates
     newSocket.on("task:created", (task) => {
-      setTasks((prev) => [task, ...prev]);
+      setTasks((prev) =>
+        prev.some((t) => t._id === task._id) ? prev : [task, ...prev]
+      );
       toast.success("New task created!");
     });
 
@@ -221,6 +223,7 @@ const GroupDetail = () => {
           group={group}
           onClose={() => setIsTaskModalOpen(false)}
           socket={socket}
+          onTaskCreated={(task) => setTasks((prev) => [task, ...prev])}
         />
       )}
 

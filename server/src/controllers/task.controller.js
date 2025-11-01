@@ -6,24 +6,39 @@ import User from "../models/user.model.js";
 export const createTask = async (req, res, io) => {
   try {
     const { groupId } = req.params;
-    const { title, description, type, unit, targetValue, assigned, deadline } = req.body;
+    const {
+      title,
+      description,
+      type,
+      unit,
+      targetValue,
+      assigned,
+      deadline,
+      color,
+    } = req.body;
 
     if (!title || !assigned || assigned.length === 0) {
-      return res.status(400).json({ message: "Title and assigned members are required" });
+      return res
+        .status(400)
+        .json({ message: "Title and assigned members are required" });
     }
 
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
     // Verify user is member
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     // Verify all assigned are members
     for (const userId of assigned) {
-      if (!group.members.includes(userId)) {
-        return res.status(400).json({ message: "Assigned user is not a member of this group" });
+      if (!group.members.some((m) => m.toString() === userId)) {
+        return res
+          .status(400)
+          .json({ message: "Assigned user is not a member of this group" });
       }
     }
 
@@ -35,7 +50,8 @@ export const createTask = async (req, res, io) => {
       type: type || "binary",
       unit: unit || "",
       targetValue: targetValue || 1,
-      assigned: assigned.map(userId => ({
+      color: color || undefined,
+      assigned: assigned.map((userId) => ({
         user: userId,
         progressValue: 0,
         completed: false,
@@ -52,7 +68,9 @@ export const createTask = async (req, res, io) => {
       io.to(`group:${groupId}`).emit("task:created", task);
     }
 
-    res.status(201).json({ message: "Task created successfully", task });
+    res
+      .status(201)
+      .json({ success: true, message: "Task created successfully", task });
   } catch (error) {
     console.error("Create task error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -67,8 +85,10 @@ export const getTasks = async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     const tasks = await Task.find({ group: groupId })
@@ -90,8 +110,10 @@ export const getTask = async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     const task = await Task.findById(taskId)
@@ -115,17 +137,23 @@ export const updateProgress = async (req, res, io) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     // Find assigned user progress
-    const assignedEntry = task.assigned.find(a => a.user.toString() === req.user.userId);
+    const assignedEntry = task.assigned.find(
+      (a) => a.user.toString() === req.user.userId
+    );
     if (!assignedEntry) {
-      return res.status(403).json({ message: "You are not assigned to this task" });
+      return res
+        .status(403)
+        .json({ message: "You are not assigned to this task" });
     }
 
     // Update progress
@@ -162,7 +190,16 @@ export const updateProgress = async (req, res, io) => {
 export const updateTask = async (req, res, io) => {
   try {
     const { groupId, taskId } = req.params;
-    const { title, description, type, unit, targetValue, assigned, deadline, status } = req.body;
+    const {
+      title,
+      description,
+      type,
+      unit,
+      targetValue,
+      assigned,
+      deadline,
+      status,
+    } = req.body;
 
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
@@ -184,7 +221,7 @@ export const updateTask = async (req, res, io) => {
     if (deadline) task.deadline = new Date(deadline);
 
     if (assigned && Array.isArray(assigned)) {
-      task.assigned = assigned.map(userId => ({
+      task.assigned = assigned.map((userId) => ({
         user: userId,
         progressValue: 0,
         completed: false,

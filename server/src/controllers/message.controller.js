@@ -10,8 +10,10 @@ export const getMessages = async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     const messages = await Message.find({ group: groupId })
@@ -38,8 +40,10 @@ export const createMessage = async (req, res, io) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.members.includes(req.user.userId)) {
-      return res.status(403).json({ message: "You are not a member of this group" });
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
     }
 
     const message = new Message({

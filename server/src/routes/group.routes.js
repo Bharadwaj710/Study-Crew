@@ -16,9 +16,19 @@ router.get("/:id", protect, getGroupById);
 router.post("/:id/join", protect, joinGroup);
 
 // Task routes - nested under groups
+// Task routes - nested under groups
 router.get("/:groupId/tasks", protect, taskController.getTasks);
-router.post("/:groupId/tasks", protect, taskController.createTask);
-router.put("/:groupId/tasks/:taskId", protect, taskController.updateTask);
-router.delete("/:groupId/tasks/:taskId", protect, taskController.deleteTask);
+router.post("/:groupId/tasks", protect, (req, res) => {
+  const io = req.app.get("io");
+  taskController.createTask(req, res, io);
+});
+router.put("/:groupId/tasks/:taskId", protect, (req, res) => {
+  const io = req.app.get("io");
+  taskController.updateTask(req, res, io);
+});
+router.delete("/:groupId/tasks/:taskId", protect, (req, res) => {
+  const io = req.app.get("io");
+  taskController.deleteTask(req, res, io);
+});
 
 export default router;

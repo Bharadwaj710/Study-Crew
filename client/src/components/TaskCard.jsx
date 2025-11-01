@@ -2,6 +2,16 @@ import React from "react";
 import { FaCheckCircle, FaClock } from "react-icons/fa";
 import TaskProgressEditor from "./TaskProgressEditor";
 
+const hexToRgba = (hex, alpha = 0.08) => {
+  if (!hex) return `rgba(59,130,246,${alpha})`;
+  const h = hex.replace("#", "");
+  const bigint = parseInt(h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 const TaskCard = ({ task, groupId, socket }) => {
   const getOverallProgress = () => {
     if (task.type === "binary") {
@@ -16,7 +26,10 @@ const TaskCard = ({ task, groupId, socket }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+    <div
+      className="rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all"
+      style={{ backgroundColor: hexToRgba(task?.color || "#3B82F6", 0.06) }}
+    >
       <h3 className="text-lg font-bold text-gray-900 mb-2">{task.title}</h3>
       <p className="text-gray-600 text-sm mb-4 line-clamp-2">
         {task.description}
@@ -32,8 +45,11 @@ const TaskCard = ({ task, groupId, socket }) => {
       {/* Progress bar */}
       <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
         <div
-          className="bg-gradient-to-r from-indigo-600 to-cyan-600 h-2 rounded-full transition-all"
-          style={{ width: `${getOverallProgress()}%` }}
+          className="h-2 rounded-full transition-all"
+          style={{
+            width: `${getOverallProgress()}%`,
+            background: task?.color || "#3B82F6",
+          }}
         />
       </div>
 
