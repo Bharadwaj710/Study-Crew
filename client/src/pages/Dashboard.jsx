@@ -17,37 +17,28 @@ const Dashboard = () => {
   }, []);
 
   const fetchUserAndGroups = async () => {
-    try {
-      // Fetch user profile
-      const userResponse = await userAPI.getProfile();
-      console.log("User profile response:", userResponse.data);
-      setUser(userResponse.data.user);
+  try {
+    // Fetch user profile
+    const userResponse = await userAPI.getProfile();
+    console.log("User profile response:", userResponse.data);
+    setUser(userResponse.data.user);
 
-      if (!userResponse.data.isProfileComplete) {
-        toast.warning(
-          "Complete your profile for personalized recommendations!",
-          {
-            autoClose: 5000,
-          }
-        );
-      }
-
-      // Fetch groups
-      const groupsResponse = await groupAPI.getGroups();
-      console.log("Groups response:", groupsResponse.data);
-      setGroups(groupsResponse.data.groups || []);
-      setLoading(false);
-    } catch (error) {
-      console.error(
-        "Error fetching data:",
-        error.response?.data || error.message
-      );
-      const errorMessage =
-        error.response?.data?.message || "Failed to load dashboard";
-      toast.error(errorMessage);
-      setLoading(false);
+    if (!userResponse.data.isProfileComplete) {
+      toast.warning("Complete your profile for personalized recommendations!", { autoClose: 5000 });
     }
-  };
+
+    // Fetch full groups info (with members) from groups API (filtered for user)
+    const groupsResponse = await groupAPI.getGroups();
+    console.log("Groups response:", groupsResponse.data);
+    setGroups(groupsResponse.data.groups || []);
+
+    setLoading(false);
+  } catch (error) {
+    console.error("Error fetching data:", error.response?.data || error.message);
+    toast.error(error.response?.data?.message || "Failed to load dashboard");
+    setLoading(false);
+  }
+};
 
   if (loading) {
     return (

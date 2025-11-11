@@ -70,7 +70,7 @@ export const searchUsers = async (req, res) => {
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
       ],
-      _id: { $ne: req.user.id }, // Exclude current user
+      _id: { $ne: req.user.userId }, // Exclude current user
     })
       .select("name email avatar skills interests")
       .limit(10);
@@ -91,7 +91,7 @@ export const recommendMembers = async (req, res) => {
 
     // Find users with matching skills or interests
     const users = await User.find({
-      _id: { $ne: req.user.id },
+      _id: { $ne: req.user.userId },
       $or: [
         { skills: { $in: skillsArray } },
         { interests: { $in: interestsArray } },

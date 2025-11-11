@@ -5,10 +5,19 @@ import Invitation from "../models/invitation.model.js";
 // Create group
 export const createGroup = async (req, res) => {
   try {
-    const { name, type, goal, privacy, invitedMembers = [], description } = req.body;
+    const {
+      name,
+      type,
+      goal,
+      privacy,
+      invitedMembers = [],
+      description,
+    } = req.body;
 
     if (!name || !type || !goal) {
-      return res.status(400).json({ message: "Name, type, and goal are required" });
+      return res
+        .status(400)
+        .json({ message: "Name, type, and goal are required" });
     }
 
     const creator = await User.findById(req.user.userId);
@@ -16,34 +25,33 @@ export const createGroup = async (req, res) => {
       return res.status(404).json({ message: "Creator not found" });
     }
 
-    const group = new Group({
-      name,
-      type,
-      goal,
-      privacy: privacy || "public",
-      creator: req.user.userId,
-      members: [req.user.userId], // Only creator as member
-      description: description || "",
-      pendingInvites: [] // empty or omit
-    });
+   const group = new Group({
+  name,
+  type,
+  goal,
+  privacy: privacy || "public",
+  creator: req.user.userId,
+  members: [req.user.userId], // only creator
+  description: description || "",
+  pendingInvites: invitedMembers,
+});
+await group.save();
 
-    await group.save();
+await User.findByIdAndUpdate(req.user.userId, {
+  $push: { joinedGroups: group._id },
+});
+if (invitedMembers.length > 0) {
+const invitations = invitedMembers.map(memberId => ({
+  sender: req.user.userId,
+  recipient: memberId,
+  group: group._id,
+  message: `You've been invited to join ${name}`,
+}));
 
-    await User.findByIdAndUpdate(req.user.userId, {
-      $push: { joinedGroups: group._id },
-    });
+await Invitation.insertMany(invitations);
 
-    // Create invitations separately
-    if (invitedMembers.length > 0) {
-      const invitations = invitedMembers.map(memberId => ({
-        sender: req.user.userId,
-        recipient: memberId,
-        group: group._id,
-        message: `You've been invited to join ${name}`,
-      }));
+}
 
-      await Invitation.insertMany(invitations);
-    }
 
     res.status(201).json({ message: "Group created successfully", group });
   } catch (error) {
@@ -55,18 +63,30 @@ export const createGroup = async (req, res) => {
 // Get all groups
 export const getGroups = async (req, res) => {
   try {
+    // Fetch user to see what groups they have confirmed membership in
+    const user = await User.findById(req.user.userId).select('joinedGroups');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Find groups that are either public or that user has joined (via joinedGroups array)
     const groups = await Group.find({
-      $or: [{ privacy: "public" }, { members: req.user.id }],
+      $or: [
+        { privacy: 'public' },
+        { _id: { $in: user.joinedGroups } }
+      ],
     })
-      .populate("creator", "name email avatar")
-      .populate("members", "name avatar")
+      .populate('creator', 'name email avatar')
+      .populate('members', 'name avatar')
       .sort({ createdAt: -1 });
 
     res.json({ groups });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // Get single group
 export const getGroupById = async (req, res) => {
@@ -80,7 +100,7 @@ export const getGroupById = async (req, res) => {
     }
 
     const isMember = group.members.some(
-      (member) => member._id.toString() === req.user.id
+      (member) => member._id.toString() === req.user.userId
     );
 
     if (group.privacy === "private" && !isMember) {
@@ -101,7 +121,7 @@ export const joinGroup = async (req, res) => {
     const group = await Group.findById(req.params.id);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (group.members.includes(req.user.id))
+    if (group.members.includes(req.user.userId))
       return res.status(400).json({ message: "Already a member" });
 
     if (group.privacy === "private")
@@ -109,10 +129,10 @@ export const joinGroup = async (req, res) => {
         .status(403)
         .json({ message: "This is a private group. You need an invitation." });
 
-    group.members.push(req.user.id);
+    group.members.push(req.user.userId);
     await group.save();
 
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(req.user.userId, {
       $push: { joinedGroups: group._id },
     });
 
