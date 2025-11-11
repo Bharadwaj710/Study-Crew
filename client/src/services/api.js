@@ -48,6 +48,8 @@ export const authAPI = {
 export const userAPI = {
   getProfile: () => api.get("/users/profile"),
   updateProfile: (data) => api.put("/users/profile", data),
+  // Public profile (no auth required endpoint)
+  getById: (id) => api.get(`/users/public/${id}`),
   searchUsers: (search) => api.get(`/users/search?search=${search}`),
   recommendMembers: (skills, interests) =>
     api.get(

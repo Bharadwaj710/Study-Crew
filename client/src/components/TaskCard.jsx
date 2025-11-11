@@ -1,5 +1,6 @@
 import React from "react";
 import { FaCheckCircle, FaClock, FaEdit } from "react-icons/fa";
+import { openProfilePopup } from "../hooks/useProfilePopup";
 
 const hexToRgba = (hex, alpha = 0.08) => {
   if (!hex) return `rgba(59,130,246,${alpha})`;
@@ -89,38 +90,55 @@ const TaskCard = ({ task, groupId, onComplete, onUpdateProgress, onEdit }) => {
 
         {/* Member progress vertical stack */}
         <div className="space-y-3 overflow-y-auto max-h-48 pr-2">
-          {task.assigned.map((a) => (
-            <div key={a.user._id} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">{a.user.name}</div>
-                <div className="text-xs text-gray-600">
-                  {task.type === "binary"
-                    ? a.completed
-                      ? "Completed"
-                      : "Pending"
-                    : `${a.progressValue || 0} / ${task.targetValue} ${
-                        task.unit || ""
-                      }`}
+          {task.assigned.map((a) => {
+            const member = a.user;
+            const memberId = member?._id || member;
+            const memberName = member?.name || "User";
+            return (
+              <div key={memberId} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">
+                    <button
+                      onClick={(e) =>
+                        openProfilePopup(memberId, e.currentTarget, {
+                          context: "group",
+                        })
+                      }
+                      className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+                    >
+                      {memberName}
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {task.type === "binary"
+                      ? a.completed
+                        ? "Completed"
+                        : "Pending"
+                      : `${a.progressValue || 0} / ${task.targetValue} ${
+                          task.unit || ""
+                        }`}
+                  </div>
+                </div>
+                <div className="w-full bg-gray-200 h-2 rounded-full">
+                  <div
+                    style={{
+                      width: `${
+                        a.completed
+                          ? 100
+                          : Math.round(
+                              ((a.progressValue || 0) /
+                                (task.targetValue || 1)) *
+                                100
+                            )
+                      }%`,
+                      background: task.color || "#3B82F6",
+                    }}
+                    className="h-2 rounded-full transition-all"
+                  />
                 </div>
               </div>
-              <div className="w-full bg-gray-200 h-2 rounded-full">
-                <div
-                  style={{
-                    width: `${
-                      a.completed
-                        ? 100
-                        : Math.round(
-                            ((a.progressValue || 0) / (task.targetValue || 1)) *
-                              100
-                          )
-                    }%`,
-                    background: task.color || "#3B82F6",
-                  }}
-                  className="h-2 rounded-full transition-all"
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

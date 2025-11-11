@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FaTimes, FaUserMinus, FaSearch, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { groupAPI, userAPI } from "../services/api";
+import { openProfilePopup } from "../hooks/useProfilePopup";
 
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,9 +78,16 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
               alt={group?.creator.name}
               className="w-10 h-10 rounded-full"
             />
-            <span className="text-gray-900 font-semibold">
+            <button
+              onClick={(e) =>
+                openProfilePopup(group?.creator._id, e.currentTarget, {
+                  context: "group",
+                })
+              }
+              className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+            >
               {group?.creator.name}
-            </span>
+            </button>
           </div>
         </div>
 
@@ -100,9 +108,16 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
                     alt={member.name}
                     className="w-8 h-8 rounded-full"
                   />
-                  <span className="text-gray-900 font-medium">
+                  <button
+                    onClick={(e) =>
+                      openProfilePopup(member._id, e.currentTarget, {
+                        context: "group",
+                      })
+                    }
+                    className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+                  >
                     {member.name}
-                  </span>
+                  </button>
                 </div>
                 {isAdmin && member._id !== group.creator._id && (
                   <button
