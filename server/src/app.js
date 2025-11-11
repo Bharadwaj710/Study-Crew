@@ -7,6 +7,7 @@ import invitationRoutes from "./routes/invitation.routes.js";
 import progressRoutes from "./routes/progress.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import taskRoutes from "./routes/task.routes.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/messages", messageRoutes);
+//app.use("/api/groups", taskRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

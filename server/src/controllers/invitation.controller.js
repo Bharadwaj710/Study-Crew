@@ -26,6 +26,7 @@ export const getInvitations = async (req, res) => {
 export const acceptInvitation = async (req, res) => {
   try {
     const invitation = await Invitation.findById(req.params.id);
+
 if (!invitation) return res.status(404).json({ message: "Invitation not found" });
 if (invitation.recipient.toString() !== req.user.userId) return res.status(403).json({ message: "Unauthorized" });
 
@@ -45,6 +46,7 @@ await User.findByIdAndUpdate(req.user.userId, {
 });
 
 res.json({ message: "Invitation accepted", group });
+
 
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

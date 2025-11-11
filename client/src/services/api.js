@@ -75,4 +75,26 @@ export const invitationAPI = {
   declineInvitation: (id) => api.patch(`/invitations/${id}/decline`),
 };
 
+export const taskAPI = {
+  getTasks: (groupId) => api.get(`/groups/${groupId}/tasks`),
+  getTask: (groupId, taskId) => api.get(`/groups/${groupId}/tasks/${taskId}`),
+  createTask: (groupId, taskData) =>
+    api.post(`/groups/${groupId}/tasks`, taskData),
+  updateTask: (groupId, taskId, data) =>
+    api.put(`/groups/${groupId}/tasks/${taskId}`, data),
+  updateProgress: (groupId, taskId, payload) =>
+    api.put(`/groups/${groupId}/tasks/${taskId}/progress`, payload),
+  completeTask: (groupId, taskId) =>
+    api.put(`/groups/${groupId}/tasks/${taskId}/complete`),
+  deleteTask: (groupId, taskId) =>
+    api.delete(`/groups/${groupId}/tasks/${taskId}`),
+};
+
+export const messageAPI = {
+  getMessages: (groupId, limit = 50) =>
+    api.get(`/groups/${groupId}/messages?limit=${limit}`),
+  sendMessage: (groupId, text) =>
+    api.post(`/groups/${groupId}/messages`, { text }),
+};
+
 export default api;
