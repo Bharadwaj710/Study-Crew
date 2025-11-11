@@ -60,6 +60,9 @@ export const createTask = async (req, res, io) => {
     });
 
     await task.save();
+    // Ensure assigned user fields are populated for clients
+    await task.populate("assigned.user", "name avatar email");
+    await task.populate("creator", "name avatar");
     await task.populate("creator", "name avatar");
     await task.populate("assigned.user", "name avatar email");
 
@@ -91,10 +94,17 @@ export const getTasks = async (req, res) => {
         .json({ message: "You are not a member of this group" });
     }
 
-    const tasks = await Task.find({ group: groupId })
+    let tasks = await Task.find({ group: groupId })
       .populate("creator", "name avatar")
-      .populate("assigned.user", "name avatar email")
-      .sort({ createdAt: -1 });
+      .populate("assigned.user", "name avatar email");
+
+    // Sort tasks by nearest deadline first. Tasks without deadline go last.
+    tasks = tasks.sort((a, b) => {
+      if (!a.deadline && !b.deadline) return 0;
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    });
 
     res.json({ tasks });
   } catch (error) {
@@ -132,56 +142,60 @@ export const getTask = async (req, res) => {
 export const updateProgress = async (req, res, io) => {
   try {
     const { groupId, taskId } = req.params;
-    const { progressValue, completed } = req.body;
+    const { value, completed } = req.body;
+    const userId = req.user.userId;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const task = await Task.findById(taskId)
+      .populate("assigned.user", "name email")
+      .populate("creator", "name email");
 
-    if (!group.members.some((m) => m.toString() === req.user.userId)) {
-      return res
-        .status(403)
-        .json({ message: "You are not a member of this group" });
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ message: "Task not found" });
-
-    // Find assigned user progress
-    const assignedEntry = task.assigned.find(
-      (a) => a.user.toString() === req.user.userId
+    // Check if user is assigned to this task
+    const assignIndex = task.assigned.findIndex(
+      (a) => a.user._id.toString() === userId
     );
-    if (!assignedEntry) {
+    if (assignIndex === -1) {
       return res
         .status(403)
         .json({ message: "You are not assigned to this task" });
     }
 
     // Update progress
-    if (task.type === "measurable" && progressValue !== undefined) {
-      assignedEntry.progressValue = progressValue;
-    } else if (task.type === "binary" && completed !== undefined) {
-      assignedEntry.completed = completed;
+    if (task.type === "binary") {
+      task.assigned[assignIndex].completed = completed;
+      task.assigned[assignIndex].progressValue = completed ? 1 : 0;
+    } else {
+      if (value > task.targetValue) {
+        return res.status(400).json({
+          message: `Value cannot exceed target of ${task.targetValue}`,
+        });
+      }
+      task.assigned[assignIndex].progressValue = value;
+      task.assigned[assignIndex].completed = value >= task.targetValue;
     }
-    assignedEntry.updatedAt = new Date();
+
+    // Update task status if all members have completed
+    const allCompleted = task.assigned.every((a) => a.completed);
+    if (allCompleted) {
+      task.status = "completed";
+    }
 
     await task.save();
-    await task.populate("creator", "name avatar");
-    await task.populate("assigned.user", "name avatar email");
 
-    // Emit socket event
+    // Emit socket event for real-time updates (use group room)
     if (io) {
       io.to(`group:${groupId}`).emit("task:progress", {
-        taskId,
-        userId: req.user.userId,
-        progressValue,
-        completed,
+        taskId: task._id,
         task,
       });
     }
 
-    res.json({ message: "Progress updated", task });
+    res.json({ task });
   } catch (error) {
-    console.error("Update progress error:", error);
+    console.error("Error updating progress:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -219,13 +233,31 @@ export const updateTask = async (req, res, io) => {
     if (targetValue) task.targetValue = targetValue;
     if (status) task.status = status;
     if (deadline) task.deadline = new Date(deadline);
+    if (req.body.color) task.color = req.body.color;
 
     if (assigned && Array.isArray(assigned)) {
-      task.assigned = assigned.map((userId) => ({
-        user: userId,
-        progressValue: 0,
-        completed: false,
-      }));
+      // Merge assigned users while preserving existing progress values when possible
+      const existingMap = new Map();
+      (task.assigned || []).forEach((a) => {
+        const uid =
+          a.user && a.user._id ? a.user._id.toString() : a.user.toString();
+        existingMap.set(uid, {
+          progressValue: a.progressValue || 0,
+          completed: !!a.completed,
+          updatedAt: a.updatedAt || new Date(),
+        });
+      });
+
+      task.assigned = assigned.map((userId) => {
+        const uid = userId.toString();
+        const prev = existingMap.get(uid);
+        return {
+          user: userId,
+          progressValue: prev ? prev.progressValue : 0,
+          completed: prev ? prev.completed : false,
+          updatedAt: prev ? prev.updatedAt : new Date(),
+        };
+      });
     }
 
     await task.save();
@@ -237,6 +269,53 @@ export const updateTask = async (req, res, io) => {
     }
 
     res.json({ message: "Task updated", task });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Complete task (mark as completed)
+export const completeTask = async (req, res, io) => {
+  try {
+    const { groupId, taskId } = req.params;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    if (!group.members.some((m) => m.toString() === req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "You are not a member of this group" });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    // Only assigned members or creator can mark as completed
+    const isAssigned = task.assigned.some(
+      (a) => a.user.toString() === req.user.userId
+    );
+    if (!isAssigned && task.creator.toString() !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "You are not assigned to this task" });
+    }
+
+    task.status = "completed";
+    // Mark all assigned entries as completed
+    task.assigned.forEach((a) => {
+      a.completed = true;
+    });
+
+    await task.save();
+    await task.populate("creator", "name avatar");
+    await task.populate("assigned.user", "name avatar email");
+
+    if (io) {
+      io.to(`group:${groupId}`).emit("task:completed", task);
+    }
+
+    res.json({ message: "Task completed", task });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

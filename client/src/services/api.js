@@ -84,6 +84,8 @@ export const taskAPI = {
     api.put(`/groups/${groupId}/tasks/${taskId}`, data),
   updateProgress: (groupId, taskId, payload) =>
     api.put(`/groups/${groupId}/tasks/${taskId}/progress`, payload),
+  completeTask: (groupId, taskId) =>
+    api.put(`/groups/${groupId}/tasks/${taskId}/complete`),
   deleteTask: (groupId, taskId) =>
     api.delete(`/groups/${groupId}/tasks/${taskId}`),
 };

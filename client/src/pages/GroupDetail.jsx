@@ -6,6 +6,8 @@ import { io } from "socket.io-client";
 import Navbar from "../components/Navbar";
 import TaskCard from "../components/TaskCard";
 import TaskModal from "../components/TaskModal";
+import TaskEditModal from "../components/TaskEditModal";
+import TaskProgressModal from "../components/TaskProgressModal";
 import GroupInfoDrawer from "../components/GroupInfoDrawer";
 import ChatPanel from "../components/ChatPanel";
 import { groupAPI, taskAPI } from "../services/api";
@@ -21,6 +23,19 @@ const GroupDetail = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [filter, setFilter] = useState("all");
   const [socket, setSocket] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [progressTask, setProgressTask] = useState(null);
+  const getCurrentUserId = () => {
+    const id = localStorage.getItem("userId");
+    if (id) return id;
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      return user?._id || user?.id || null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
 
   // Initialize socket and fetch data
   useEffect(() => {
@@ -30,7 +45,15 @@ const GroupDetail = () => {
         setGroup(groupRes.data.group);
 
         const tasksRes = await taskAPI.getTasks(id);
-        setTasks(tasksRes.data.tasks || []);
+        const fetched = tasksRes.data.tasks || [];
+        // sort by deadline (nearest first). Tasks without deadline go last.
+        const sorted = fetched.sort((a, b) => {
+          if (!a.deadline && !b.deadline) return 0;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return new Date(a.deadline) - new Date(b.deadline);
+        });
+        setTasks(sorted);
 
         setLoading(false);
       } catch (error) {
@@ -51,26 +74,54 @@ const GroupDetail = () => {
 
     newSocket.emit("joinGroup", id);
 
+    // Function to sort tasks by deadline
+    const sortTasks = (tasks) => {
+      return [...tasks].sort((a, b) => {
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    };
+
     // Listen for real-time updates
-    newSocket.on("task:created", (task) => {
-      setTasks((prev) =>
-        prev.some((t) => t._id === task._id) ? prev : [task, ...prev]
-      );
-      toast.success("New task created!");
-    });
+    const handleTaskUpdate = (updater) => {
+      setTasks((prev) => {
+        const updated = updater(prev);
+        return sortTasks(updated);
+      });
+    };
 
-    newSocket.on("task:progress", (data) => {
-      setTasks((prev) =>
-        prev.map((t) => (t._id === data.taskId ? data.task : t))
-      );
-    });
+    const eventHandlers = {
+      "task:created": (task) => {
+        // Only add if it doesn't exist
+        handleTaskUpdate((prev) => {
+          return prev.some((t) => t._id === task._id) ? prev : [task, ...prev];
+        });
+      },
+      "task:progress": (data) => {
+        handleTaskUpdate((prev) =>
+          prev.map((t) => (t._id === data.taskId ? data.task : t))
+        );
+      },
+      "task:updated": (task) => {
+        handleTaskUpdate((prev) =>
+          prev.map((t) => (t._id === task._id ? task : t))
+        );
+      },
+      "task:deleted": ({ taskId }) => {
+        handleTaskUpdate((prev) => prev.filter((t) => t._id !== taskId));
+      },
+      "task:completed": (task) => {
+        handleTaskUpdate((prev) =>
+          prev.map((t) => (t._id === task._id ? task : t))
+        );
+      },
+    };
 
-    newSocket.on("task:updated", (task) => {
-      setTasks((prev) => prev.map((t) => (t._id === task._id ? task : t)));
-    });
-
-    newSocket.on("task:deleted", ({ taskId }) => {
-      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    // Register socket event handlers
+    Object.entries(eventHandlers).forEach(([event, handler]) => {
+      newSocket.on(event, handler);
     });
 
     setSocket(newSocket);
@@ -87,11 +138,13 @@ const GroupDetail = () => {
       case "completed":
         return tasks.filter((t) => t.status === "completed");
       case "myTasks":
-        return tasks.filter((t) =>
-          t.assigned.some((a) => a.user._id === localStorage.getItem("userId"))
+        return tasks.filter(
+          (t) =>
+            t.status !== "completed" &&
+            t.assigned.some((a) => a.user._id === currentUserId)
         );
       default:
-        return tasks;
+        return tasks.filter((t) => t.status !== "completed");
     }
   };
 
@@ -188,6 +241,34 @@ const GroupDetail = () => {
                     task={task}
                     groupId={id}
                     socket={socket}
+                    onUpdateProgress={async (t) => {
+                      try {
+                        const res = await taskAPI.getTask(id, t._id);
+                        const fresh = res.data.task;
+                        setProgressTask(fresh);
+                      } catch (err) {
+                        console.error(
+                          "Failed to fetch task for progress modal",
+                          err
+                        );
+                        setProgressTask(t); // fallback to provided task
+                        toast.error("Failed to load latest task data");
+                      }
+                    }}
+                    onEdit={(t) => setEditingTask(t)}
+                    onComplete={async (t) => {
+                      try {
+                        const res = await taskAPI.completeTask(id, t._id);
+                        const updated = res.data.task;
+                        setTasks((prev) =>
+                          prev.map((p) => (p._id === updated._id ? updated : p))
+                        );
+                        toast.success("Task marked completed");
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Failed to mark completed");
+                      }
+                    }}
                   />
                 ))}
               </div>
@@ -227,12 +308,45 @@ const GroupDetail = () => {
         />
       )}
 
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          group={group}
+          groupId={id}
+          onClose={() => setEditingTask(null)}
+          onTaskUpdated={(updated) => {
+            setTasks((prev) =>
+              prev.map((t) => (t._id === updated._id ? updated : t))
+            );
+            setEditingTask(null);
+          }}
+          onTaskDeleted={(taskId) => {
+            setTasks((prev) => prev.filter((t) => t._id !== taskId));
+            setEditingTask(null);
+          }}
+        />
+      )}
+
       {isGroupInfoOpen && (
         <GroupInfoDrawer
           group={group}
           onClose={() => setIsGroupInfoOpen(false)}
           onUpdate={(updated) => setGroup(updated)}
           onLeave={() => navigate("/dashboard")}
+        />
+      )}
+
+      {progressTask && (
+        <TaskProgressModal
+          task={progressTask}
+          groupId={id}
+          onClose={() => setProgressTask(null)}
+          onProgressUpdated={(updated) => {
+            setTasks((prev) =>
+              prev.map((t) => (t._id === updated._id ? updated : t))
+            );
+            setProgressTask(null);
+          }}
         />
       )}
     </div>

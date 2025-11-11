@@ -112,25 +112,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center cursor-pointer group">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded bg-white/10 border border-white/20 cursor-pointer accent-cyan-500 group-hover:bg-white/20 transition-colors"
-                />
-                <span className="ml-2 text-gray-300 group-hover:text-white transition-colors">
-                  Remember me
-                </span>
-              </label>
-              <a
-                href="#"
-                className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
-              >
-                Forgot?
-              </a>
-            </div>
-
             {/* Sign In Button */}
             <button
               type="submit"

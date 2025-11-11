@@ -6,7 +6,17 @@ import { groupAPI, userAPI } from "../services/api";
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const isAdmin = group?.creator._id === localStorage.getItem("userId");
+  const getCurrentUserId = () => {
+    const id = localStorage.getItem("userId");
+    if (id) return id;
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      return user?._id || user?.id || null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const isAdmin = group?.creator._id === getCurrentUserId();
 
   const handleSearch = async () => {
     if (searchQuery.trim().length < 2) return;
