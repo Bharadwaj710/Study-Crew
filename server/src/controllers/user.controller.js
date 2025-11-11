@@ -1,4 +1,5 @@
 import User from "../models/user.model.js";
+import validator from "validator";
 // Get current user profile
 export const getProfile = async (req, res) => {
   try {
@@ -23,7 +24,16 @@ export const getProfile = async (req, res) => {
 // Update user profile
 export const updateProfile = async (req, res) => {
   try {
-    const { name, about, education, interests, skills, avatar } = req.body;
+    const {
+      name,
+      about,
+      education,
+      interests,
+      skills,
+      avatar,
+      links,
+      contact,
+    } = req.body;
 
     const user = await User.findById(req.user.userId);
 
@@ -38,6 +48,56 @@ export const updateProfile = async (req, res) => {
     if (interests) user.interests = interests;
     if (skills) user.skills = skills;
     if (avatar) user.avatar = avatar;
+
+    // Handle links if provided: validate and sanitize
+    if (links && Array.isArray(links)) {
+      const validLinks = [];
+      for (const l of links) {
+        if (!l) continue;
+        const nameVal = (l.name || "").toString().trim();
+        const urlVal = (l.url || "").toString().trim();
+        // require both name and a valid absolute URL (with protocol)
+        if (
+          nameVal.length > 0 &&
+          urlVal.length > 0 &&
+          validator.isURL(urlVal, { require_protocol: true })
+        ) {
+          validLinks.push({ name: nameVal, url: urlVal });
+        }
+      }
+      // Replace user's links with validated set
+      user.links = validLinks;
+    }
+
+    // Handle contact updates if provided: merge partial updates.
+    // Be permissive and store trimmed values sent by the client so UX is not confusing.
+    if (contact && typeof contact === "object") {
+      const updatedContact = { ...(user.contact || {}) };
+
+      // Phone: store trimmed value (client already validates length). Keep formatting.
+      if (contact.phone !== undefined) {
+        updatedContact.phone = (contact.phone || "").toString().trim();
+      }
+
+      // Alternate email: store trimmed value. Server-side validation available but do not block saving here.
+      if (contact.alternateEmail !== undefined) {
+        updatedContact.alternateEmail = (contact.alternateEmail || "")
+          .toString()
+          .trim();
+      }
+
+      // City / state / country: accept trimmed strings (allow empty to clear)
+      ["city", "state", "country"].forEach((f) => {
+        if (contact[f] !== undefined) {
+          updatedContact[f] = (contact[f] || "").toString().trim();
+        }
+      });
+
+      // Debug log to trace contact updates
+      console.log("Updating contact for user", req.user.userId, updatedContact);
+
+      user.contact = updatedContact;
+    }
 
     // Check if profile is complete
     user.isProfileComplete = user.checkProfileCompletion();

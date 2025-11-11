@@ -7,6 +7,10 @@ import {
   FaLightbulb,
   FaCode,
   FaInfoCircle,
+  FaLink,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
@@ -26,6 +30,14 @@ const Profile = () => {
     },
     interests: [],
     skills: [],
+    links: [],
+    contact: {
+      phone: "",
+      alternateEmail: "",
+      city: "",
+      state: "",
+      country: "",
+    },
   });
   const [newInterest, setNewInterest] = useState("");
   const [newSkill, setNewSkill] = useState("");
@@ -53,6 +65,14 @@ const Profile = () => {
         },
         interests: response.data.user.interests || [],
         skills: response.data.user.skills || [],
+        links: response.data.user.links || [],
+        contact: response.data.user.contact || {
+          phone: "",
+          alternateEmail: "",
+          city: "",
+          state: "",
+          country: "",
+        },
       });
       setLoading(false);
     } catch (error) {
@@ -102,12 +122,33 @@ const Profile = () => {
     e.preventDefault();
     setSaving(true);
 
+    // Client-side validation for contact fields
     try {
+      const contact = formData.contact || {};
+      if (contact.alternateEmail && contact.alternateEmail.trim() !== "") {
+        const emailVal = contact.alternateEmail.trim();
+        // simple email pattern
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(emailVal)) {
+          toast.error("Please enter a valid alternate email");
+          setSaving(false);
+          return;
+        }
+      }
+      if (contact.phone && contact.phone.trim() !== "") {
+        const digits = contact.phone.replace(/\D/g, "");
+        if (digits.length < 8 || digits.length > 15) {
+          toast.error("Please enter a valid phone number (8-15 digits)");
+          setSaving(false);
+          return;
+        }
+      }
+
       await userAPI.updateProfile(formData);
       toast.success("Profile updated successfully! 🎉");
       fetchProfile();
     } catch (error) {
-      toast.error("Failed to update profile");
+      toast.error(error.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -172,6 +213,7 @@ const Profile = () => {
             { id: "education", label: "Education", icon: FaGraduationCap },
             { id: "interests", label: "Interests", icon: FaLightbulb },
             { id: "skills", label: "Skills", icon: FaCode },
+            { id: "links", label: "Links", icon: FaLink },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -240,6 +282,105 @@ const Profile = () => {
                   rows="4"
                   placeholder="Tell us about yourself and your learning goals..."
                 />
+              </div>
+
+              {/* Contact Information */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
+                  <FaPhone className="text-indigo-600" /> Contact Information
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600">
+                      Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.contact?.phone || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contact: {
+                            ...(formData.contact || {}),
+                            phone: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      placeholder="e.g. +91 9876543210"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600">
+                      Alternate Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.contact?.alternateEmail || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contact: {
+                            ...(formData.contact || {}),
+                            alternateEmail: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      placeholder="e.g. user@domain.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={formData.contact?.city || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          city: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={formData.contact?.state || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          state: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Country"
+                    value={formData.contact?.country || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          country: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -433,6 +574,89 @@ const Profile = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Links Tab */}
+          {activeTab === "links" && (
+            <div className="bg-white rounded-2xl border border-gray-200/50 shadow-lg p-8 space-y-4">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center mb-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-cyan-600 rounded mr-3"></div>
+                Links to Other Profiles
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                Add links to your external profiles (LinkedIn, GitHub, LeetCode,
+                Twitter, project pages, etc.). Use full URLs (including
+                https://).
+              </p>
+
+              <div className="space-y-3">
+                {(formData.links || []).map((link, idx) => (
+                  <div key={idx} className="flex gap-3 items-center">
+                    <input
+                      type="text"
+                      placeholder="Name (e.g., GitHub)"
+                      value={link.name}
+                      onChange={(e) => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links[idx] = {
+                          ...updated.links[idx],
+                          name: e.target.value,
+                        };
+                        setFormData(updated);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+
+                    <input
+                      type="url"
+                      placeholder="https://example.com/you"
+                      value={link.url}
+                      onChange={(e) => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links[idx] = {
+                          ...updated.links[idx],
+                          url: e.target.value,
+                        };
+                        setFormData(updated);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links.splice(idx, 1);
+                        setFormData(updated);
+                      }}
+                      className="p-2 rounded-md text-gray-500 hover:text-red-600"
+                      aria-label="Remove link"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      links: [...(formData.links || []), { name: "", url: "" }],
+                    })
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-semibold rounded-lg"
+                >
+                  <FaPlus /> Add Link
+                </button>
               </div>
             </div>
           )}
