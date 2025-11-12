@@ -3,6 +3,7 @@ import {
   createGroup,
   getGroups,
   getGroupById,
+  deleteGroup,
   joinGroup,
 } from "../controllers/group.controller.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -14,6 +15,9 @@ router.post("/", protect, createGroup);
 router.get("/", protect, getGroups);
 router.get("/:id", protect, getGroupById);
 router.post("/:id/join", protect, joinGroup);
+
+// Delete group (creator only)
+router.delete("/:id", protect, deleteGroup);
 
 // Task routes - nested under groups
 // Task routes - nested under groups

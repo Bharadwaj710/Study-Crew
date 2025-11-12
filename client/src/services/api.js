@@ -74,6 +74,7 @@ export const groupAPI = {
   getGroups: () => api.get("/groups"),
   getGroupById: (id) => api.get(`/groups/${id}`),
   joinGroup: (id) => api.post(`/groups/${id}/join`),
+  deleteGroup: (id) => api.delete(`/groups/${id}`),
 };
 
 // Invitation API
