@@ -65,18 +65,13 @@ export const createGroup = async (req, res) => {
 // Get all groups
 export const getGroups = async (req, res) => {
   try {
-    // Fetch user to see what groups they have confirmed membership in
-    const user = await User.findById(req.user.userId).select("joinedGroups");
+    const userId = req.user.userId || req.user.id;
 
+    // Fetch user
+    const user = await User.findById(userId).select("joinedGroups");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    // Fetch groups:
-    // 1. Where user is member
-    // 2. OR user is creator
-    // 3. OR user in pendingInvites
-    // 4. OR user has joinRequests with status pending
 
     const groups = await Group.find({
       $or: [

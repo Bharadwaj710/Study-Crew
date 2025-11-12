@@ -299,13 +299,18 @@ const GroupDetail = () => {
 
       {/* Modals */}
       {isTaskModalOpen && (
-        <TaskModal
-          groupId={id}
-          group={group}
-          onClose={() => setIsTaskModalOpen(false)}
-          socket={socket}
-          onTaskCreated={(task) => setTasks((prev) => [task, ...prev])}
-        />
+       <TaskModal
+  groupId={id}
+  group={group}
+  onClose={() => setIsTaskModalOpen(false)}
+  socket={socket}
+  onTaskCreated={(task) =>
+    setTasks((prev) => {
+      if (prev.some((t) => t._id === task._id)) return prev;
+      return [task, ...prev];
+    })
+  }
+/>
       )}
 
       {editingTask && (
