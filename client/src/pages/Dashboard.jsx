@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaPlus, FaSearch, FaUsers, FaArrowRight } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
-import { userAPI, groupAPI } from "../services/api";
+import { userAPI, groupAPI, notificationAPI } from "../services/api";
 import { HiOutlineSparkles } from "react-icons/hi2";
 
 const Dashboard = () => {
@@ -16,29 +16,50 @@ const Dashboard = () => {
     fetchUserAndGroups();
   }, []);
 
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await notificationAPI.getNotifications();
+        setNotifications(res.data.notifications);
+      } catch (error) {
+        console.error("Failed to load notifications:", error);
+      }
+    };
+    fetchNotifications();
+  }, []);
+
   const fetchUserAndGroups = async () => {
-  try {
-    // Fetch user profile
-    const userResponse = await userAPI.getProfile();
-    console.log("User profile response:", userResponse.data);
-    setUser(userResponse.data.user);
+    try {
+      // Fetch user profile
+      const userResponse = await userAPI.getProfile();
+      setUser(userResponse.data.user);
 
-    if (!userResponse.data.isProfileComplete) {
-      toast.warning("Complete your profile for personalized recommendations!", { autoClose: 5000 });
+      if (!userResponse.data.isProfileComplete) {
+        toast.warning("Complete your profile for personalized recommendations!", { autoClose: 5000 });
+      }
+
+      // Fetch groups user is involved with
+      const groupsResponse = await groupAPI.getGroups();
+      setGroups(groupsResponse.data.groups || []);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching data:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Failed to load dashboard");
+      setLoading(false);
     }
+  };
 
-    // Fetch full groups info (with members) from groups API (filtered for user)
-    const groupsResponse = await groupAPI.getGroups();
-    console.log("Groups response:", groupsResponse.data);
-    setGroups(groupsResponse.data.groups || []);
-
-    setLoading(false);
-  } catch (error) {
-    console.error("Error fetching data:", error.response?.data || error.message);
-    toast.error(error.response?.data?.message || "Failed to load dashboard");
-    setLoading(false);
-  }
-};
+  // Prevent navigation to groups with pending join request/invitation
+  const onGroupClick = (group) => {
+    if (group.requestPending) {
+      toast.warning("Your request to join this group is pending approval.");
+      return;
+    }
+    navigate(`/group/${group._id}`);
+  };
 
   if (loading) {
     return (
@@ -47,9 +68,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-center h-96">
           <div className="flex flex-col items-center gap-4">
             <div className="w-16 h-16 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div>
-            <p className="text-gray-600 font-medium">
-              Loading your dashboard...
-            </p>
+            <p className="text-gray-600 font-medium">Loading your dashboard...</p>
           </div>
         </div>
       </div>
@@ -73,9 +92,7 @@ const Dashboard = () => {
                 </h1>
               </div>
               <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-                Create a study group or join an existing one to start
-                collaborating with your peers and achieve your learning goals
-                together.
+                Create a study group or join an existing one to start collaborating with your peers and achieve your learning goals together.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
@@ -87,7 +104,7 @@ const Dashboard = () => {
                   Create Group
                 </button>
                 <button
-                  onClick={() => navigate("/join-group")}
+                  onClick={() => navigate("/explore-groups")}
                   className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 text-white rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg shadow-md group"
                 >
                   <FaSearch className="mr-2 group-hover:scale-110 transition-transform" />
@@ -119,13 +136,8 @@ const Dashboard = () => {
                   <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-100 mb-4">
                     <FaUsers className="text-indigo-600 text-4xl" />
                   </div>
-                  <p className="text-gray-900 text-xl font-semibold mb-2">
-                    No groups yet
-                  </p>
-                  <p className="text-gray-600 mb-6">
-                    Create or join a group to start your collaborative learning
-                    journey!
-                  </p>
+                  <p className="text-gray-900 text-xl font-semibold mb-2">No groups yet</p>
+                  <p className="text-gray-600 mb-6">Create or join a group to start your collaborative learning journey!</p>
                   <button
                     onClick={() => navigate("/create-group")}
                     className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-all duration-300 hover:shadow-lg"
@@ -139,36 +151,45 @@ const Dashboard = () => {
                   {groups.map((group) => (
                     <div
                       key={group._id}
-                      onClick={() => navigate(`/group/${group._id}`)}
-                      className="group cursor-pointer p-6 border border-gray-200 rounded-xl hover:border-indigo-300 bg-white hover:bg-gradient-to-br hover:from-indigo-50 hover:to-cyan-50 transition-all duration-300 hover:shadow-lg transform hover:scale-105"
+                      onClick={() => {
+                        if (group.requestPending) {
+                          toast.warning("Your request to join this group is pending approval.");
+                          return;
+                        }
+                        navigate(`/group/${group._id}`);
+                      }}
+                      className={`group cursor-pointer p-6 border border-gray-200 rounded-xl transition-all duration-300 hover:shadow-lg transform hover:scale-105 bg-white hover:bg-gradient-to-br hover:from-indigo-50 hover:to-cyan-50 ${
+                        group.requestPending ? "cursor-not-allowed opacity-60 hover:shadow-none hover:scale-100" : ""
+                      }`}
                     >
-                      {/* Type Badge */}
+                      {/* Type Badge and Request Pending Badge */}
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-2">
                           {group.name}
                         </h3>
-                        <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ml-2 ${
-                            group.type === "study"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
-                        >
-                          {group.type === "study" ? "📚 Study" : "💻 Hackathon"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ml-2 ${
+                              group.type === "study" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                            }`}
+                          >
+                            {group.type === "study" ? "📚 Study" : "💻 Hackathon"}
+                          </span>
+                          {group.requestPending && (
+                            <span className="px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-yellow-100 text-yellow-800 ml-2">
+                              Request Pending
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Goal */}
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                        {group.goal}
-                      </p>
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{group.goal}</p>
 
                       {/* Footer */}
                       <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700">
-                            {group.members?.length || 0}
-                          </span>
+                          <span className="font-semibold text-gray-700">{group.members?.length || 0}</span>
                           <span>members</span>
                         </div>
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaTimes,
   FaUserMinus,
@@ -12,41 +13,111 @@ import { openProfilePopup } from "../hooks/useProfilePopup";
 import { useNavigate } from "react-router-dom";
 
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+const groupId = group?._id;
+
+ const [members, setMembers] = useState(group?.members || []);
+const [leaving, setLeaving] = useState(false);
+const navigate = useNavigate();
+useEffect(() => {
+  if (group) setMembers(group.members || []);
+}, [group]);
+
+  // Retrieve and memoize current userId once
   const getCurrentUserId = () => {
     const id = localStorage.getItem("userId");
     if (id) return id;
     try {
       const user = JSON.parse(localStorage.getItem("user"));
       return user?._id || user?.id || null;
-    } catch (e) {
+    } catch {
       return null;
     }
   };
-  const isAdmin = group?.creator._id === getCurrentUserId();
-  const navigate = useNavigate();
+  const currentUserId = getCurrentUserId();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  const isAdmin = group?.creator?._id === currentUserId;
+
+  // Fetch join requests only if current user is admin (creator)
+  useEffect(() => {
+    if (isAdmin) {
+      setLoadingRequests(true);
+      groupAPI
+        .getJoinRequests(group._id)
+        .then((res) => setJoinRequests(res.data.joinRequests))
+        .catch(() => toast.error("Failed to load join requests"))
+        .finally(() => setLoadingRequests(false));
+    } else {
+      setJoinRequests([]);
+    }
+  }, [group._id, isAdmin]);
+
+const handleRequest = async (userId, action) => {
+  try {
+    const res = await groupAPI.handleJoinRequest(group._id, userId, action);
+    const updatedGroup = res.data.group;
+    setJoinRequests(updatedGroup.joinRequests.filter((j) => j.status === "pending"));
+    setMembers(updatedGroup.members);
+    toast.success(`Request ${action}ed successfully`);
+  } catch (error) {
+    toast.error(`Failed to ${action} request`);
+  }
+};
+
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
 
   const handleSearch = async () => {
     if (searchQuery.trim().length < 2) return;
     try {
       const res = await userAPI.searchUsers(searchQuery);
       setSearchResults(res.data.users);
-    } catch (error) {
+    } catch {
       toast.error("Search failed");
     }
   };
 
-  const handleRemoveMember = async (userId) => {
-    if (!window.confirm("Remove this member?")) return;
+const handleRemoveMember = async (userId) => {
+  if (userId === group.creator._id) {
+    toast.error("Creator cannot remove themselves");
+    return;
+  }
+  if (!window.confirm("Remove this member from the group?")) return;
+  try {
+    const res = await groupAPI.removeMember(group._id, userId);
+    setMembers(res.data.group.members);
+    toast.success("Member removed successfully");
+  } catch (error) {
+    toast.error("Failed to remove member");
+    console.error(error);
+  }
+};
+
+
+const handleLeaveGroup = async () => {
+    setLeaving(true);
     try {
-      // Call backend to remove member
-      toast.success("Member removed");
-      // Refresh group data
+      const res = await groupAPI.leaveGroup(group._id);
+      if (res.status === 200) {
+        toast.success("You left the group successfully!");
+        navigate("/dashboard");
+        return;
+      }
+      toast.info("Leaving group... Please wait.");
     } catch (error) {
-      toast.error("Failed to remove member");
+      if (error.response?.status === 403) {
+        toast.success("You left the group successfully!");
+        navigate("/explore");
+      } else {
+        toast.error(error.response?.data?.message || "Failed to leave group");
+      }
+    } finally {
+      setLeaving(false);
     }
   };
 
@@ -63,9 +134,7 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
       <div className="p-6 space-y-6">
         {/* Group details */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">
-            {group?.name}
-          </h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">{group?.name}</h3>
           <p className="text-gray-600 text-sm mb-3">{group?.goal}</p>
           <div className="flex gap-2">
             <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">
@@ -79,9 +148,7 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
 
         {/* Creator info */}
         <div className="border-t pt-4">
-          <p className="text-xs text-gray-500 uppercase font-semibold mb-2">
-            Created by
-          </p>
+          <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Created by</p>
           <div className="flex items-center gap-3">
             <img
               src={group?.creator.avatar}
@@ -104,7 +171,7 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
         {/* Members */}
         <div className="border-t pt-4">
           <p className="text-xs text-gray-500 uppercase font-semibold mb-3">
-            Members ({group?.members.length})
+            Members ({group?.members.length || 0})
           </p>
           <div className="space-y-2">
             {group?.members.map((member) => (
@@ -133,6 +200,7 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
                   <button
                     onClick={() => handleRemoveMember(member._id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remove member"
                   >
                     <FaUserMinus />
                   </button>
@@ -142,24 +210,53 @@ const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
           </div>
         </div>
 
-        {/* Leave group */}
+        {/* Join Requests */}
         {isAdmin && (
-          <div className="mb-3">
-            <button
-              onClick={() => setShowConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-full hover:from-red-600 hover:to-red-700 transition-all shadow-md"
-            >
-              <FaTrash /> Delete Group
-            </button>
+          <div className="border-t pt-4">
+            <h4 className="font-bold mt-5 mb-2">Join Requests</h4>
+            {loadingRequests ? (
+              <p className="text-gray-500">Loading join requests...</p>
+            ) : (
+              <>
+                {joinRequests.length === 0 ? (
+                  <p className="text-gray-500">No pending requests</p>
+                ) : (
+                  joinRequests.map((req) => (
+                    <div key={req.user._id} className="flex items-center gap-3 mb-2">
+                      <img
+                        src={req.user.avatar}
+                        alt={req.user.name}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <span>{req.user.name}</span>
+                      <button
+                        onClick={() => handleRequest(req.user._id, "accept")}
+                        className="ml-auto bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleRequest(req.user._id, "decline")}
+                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ))
+                )}
+              </>
+            )}
           </div>
         )}
 
-        <button
-          onClick={onLeave}
-          className="w-full px-4 py-3 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition-all"
-        >
-          Leave Group
-        </button>
+        {/* Leave group */}
+      <button
+  onClick={handleLeaveGroup}
+  disabled={leaving}
+  className="w-full px-4 py-3 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 disabled:opacity-50"
+>
+  {leaving ? "Leaving..." : "Leave Group"}
+</button>
       </div>
       {/* Confirmation Modal */}
       {showConfirm && (
