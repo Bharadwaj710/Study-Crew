@@ -10,7 +10,6 @@ import {
 import { toast } from "react-toastify";
 import { groupAPI, userAPI } from "../services/api";
 import { openProfilePopup } from "../hooks/useProfilePopup";
-import { useNavigate } from "react-router-dom";
 
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
 const groupId = group?._id;
@@ -71,7 +70,6 @@ const handleRequest = async (userId, action) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-
   const handleSearch = async () => {
     if (searchQuery.trim().length < 2) return;
     try {
@@ -97,7 +95,6 @@ const handleRemoveMember = async (userId) => {
     console.error(error);
   }
 };
-
 
 const handleLeaveGroup = async () => {
     setLeaving(true);
@@ -248,6 +245,17 @@ const handleLeaveGroup = async () => {
             )}
           </div>
         )}
+{/* Delete group - only visible to creator */}
+{isAdmin && (
+  <div className="mb-3">
+    <button
+      onClick={() => setShowConfirm(true)}
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-full hover:from-red-600 hover:to-red-700 transition-all shadow-md"
+    >
+      <FaTrash /> Delete Group
+    </button>
+  </div>
+)}
 
         {/* Leave group */}
       <button
