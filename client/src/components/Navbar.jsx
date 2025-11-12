@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaBell, FaSignOutAlt, FaCog, FaChevronDown } from "react-icons/fa";
-import { authAPI, invitationAPI } from "../services/api";
+import { authAPI, invitationAPI, notificationAPI } from "../services/api";
 import { toast } from "react-toastify";
 
 const Navbar = ({ user }) => {
@@ -25,8 +25,13 @@ const Navbar = ({ user }) => {
 
   const fetchNotificationCount = async () => {
     try {
-      const response = await invitationAPI.getInvitations();
-      setNotificationCount(response.data.count);
+      const [invRes, notifRes] = await Promise.all([
+        invitationAPI.getInvitations(),
+        notificationAPI.getNotifications(),
+      ]);
+      const invCount = invRes?.data?.invitations?.length || 0;
+      const notifCount = notifRes?.data?.notifications?.length || 0;
+      setNotificationCount(invCount + notifCount);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }

@@ -16,7 +16,7 @@ import CreateGroup from "./pages/CreateGroup";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import GroupDetail from "./pages/GroupDetail";
-
+import ExploreGroups from "./pages/ExploreGroups";
 // ✅ Protected Route
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -74,6 +74,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/explore-groups" element={<ExploreGroups />} />
+
           {/* 404 Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

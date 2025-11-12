@@ -38,6 +38,11 @@ const groupSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    joinRequests: [{
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  requestedAt: { type: Date, default: Date.now },
+  status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' }
+}],
     description: {
       type: String,
       default: "",

@@ -8,6 +8,7 @@ import progressRoutes from "./routes/progress.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import taskRoutes from "./routes/task.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/invitations", invitationRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/messages", messageRoutes);
 //app.use("/api/groups", taskRoutes);

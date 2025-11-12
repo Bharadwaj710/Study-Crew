@@ -1,66 +1,155 @@
 import React, { useState, useEffect } from "react";
-import { FaCheck, FaTimes, FaEnvelope, FaArrowRight } from "react-icons/fa";
+import { FaCheck, FaTimes, FaEnvelope, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
-import { invitationAPI, userAPI } from "../services/api";
+import { invitationAPI, userAPI, notificationAPI } from "../services/api";
 
 const Notifications = () => {
   const [user, setUser] = useState(null);
-  const [invitations, setInvitations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processedIds, setProcessedIds] = useState(new Set());
+  const [removingId, setRemovingId] = useState(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Fetch all notifications
   const fetchData = async () => {
     try {
-      const [userResponse, invitationsResponse] = await Promise.all([
-        userAPI.getProfile(),
-        invitationAPI.getInvitations(),
-      ]);
+      const [userResponse, invitationResponse, notificationResponse] =
+        await Promise.all([
+          userAPI.getProfile(),
+          invitationAPI.getInvitations(),
+          notificationAPI.getNotifications(),
+        ]);
 
       setUser(userResponse.data.user);
-      setInvitations(invitationsResponse.data.invitations);
+
+      // Merge invitations and notifications
+      const allNotifications = [
+        ...invitationResponse.data.invitations.map((i) => ({
+          ...i,
+          type: "invitation",
+          isJoinRequest: false,
+        })),
+        ...notificationResponse.data.notifications.map((n) => ({
+          ...n,
+          isJoinRequest: n.type === "join_request",
+        })),
+      ];
+
+      allNotifications.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
+      setNotifications(allNotifications);
       setLoading(false);
     } catch (error) {
+      console.error("Failed to load notifications:", error);
       toast.error("Failed to load notifications");
       setLoading(false);
     }
   };
 
-  const handleAccept = async (invitationId) => {
-    setProcessedIds((prev) => new Set([...prev, invitationId]));
+  const handleAccept = async (notif) => {
+    const id = notif._id;
+    setProcessedIds((prev) => new Set([...prev, id]));
     try {
-      await invitationAPI.acceptInvitation(invitationId);
-      toast.success("🎉 Invitation accepted! You are now a member.");
+      if (notif.isJoinRequest) {
+        await notificationAPI.respondNotification(id, "accept");
+        toast.success("✅ Join request accepted!");
+      } else {
+        await invitationAPI.acceptInvitation(id);
+        toast.success("🎉 Invitation accepted!");
+      }
       fetchData();
     } catch (error) {
-      toast.error("Failed to accept invitation");
+      toast.error("Failed to accept request");
       setProcessedIds((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(invitationId);
+        newSet.delete(id);
         return newSet;
       });
     }
   };
 
-  const handleDecline = async (invitationId) => {
-    setProcessedIds((prev) => new Set([...prev, invitationId]));
+  const handleDecline = async (notif) => {
+    const id = notif._id;
+    setProcessedIds((prev) => new Set([...prev, id]));
     try {
-      await invitationAPI.declineInvitation(invitationId);
-      toast.info("Invitation declined");
+      if (notif.isJoinRequest) {
+        await notificationAPI.respondNotification(id, "decline");
+        toast.info("❌ Join request declined");
+      } else {
+        await invitationAPI.declineInvitation(id);
+        toast.info("Invitation declined");
+      }
       fetchData();
     } catch (error) {
-      toast.error("Failed to decline invitation");
+      toast.error("Failed to decline request");
       setProcessedIds((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(invitationId);
+        newSet.delete(id);
         return newSet;
       });
     }
   };
+
+  // 🗑️ Handle remove
+  const handleRemove = async (notifId) => {
+    try {
+      setRemovingId(notifId);
+      await notificationAPI.deleteNotification(notifId);
+      toast.success("🗑️ Notification removed");
+      setNotifications((prev) =>
+        prev.filter((n) => n._id !== notifId)
+      );
+    } catch (error) {
+      toast.error("Failed to remove notification");
+      console.error(error);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  // Helpers
+const getNotificationTitle = (notif) => {
+  switch (notif.type) {
+    case "join_request":
+      return "Join Request";
+    case "join_response":
+      return "Group Update";
+    case "removed_member":
+      return "Removed from Group";
+    case "group_activity":
+      return "Group Activity";
+    case "invitation":
+      return "Group Invitation";
+    default:
+      return "Notification";
+  }
+};
+
+const getNotificationMessage = (notif) => {
+  switch (notif.type) {
+    case "join_request":
+      return `${notif.from?.name || "Someone"} requested to join "${
+        notif.group?.name
+      }"`;
+    case "join_response":
+    case "removed_member":
+    case "group_activity":
+      return notif.message;
+    case "invitation":
+      return `${
+        notif.sender?.name || notif.from?.name
+      } invited you to join "${notif.group?.name}"`;
+    default:
+      return notif.message || "You have a new notification.";
+  }
+};
 
   if (loading) {
     return (
@@ -94,30 +183,31 @@ const Notifications = () => {
               Notifications
             </h1>
             <p className="text-gray-600 mt-2">
-              {invitations.length}{" "}
-              {invitations.length === 1 ? "invitation" : "invitations"} pending
+              {notifications.length}{" "}
+              {notifications.length === 1 ? "notification" : "notifications"}{" "}
+              total
             </p>
           </div>
         </div>
 
-        {/* Notifications Container */}
-        {invitations.length === 0 ? (
+        {/* Notifications List */}
+        {notifications.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200/50 shadow-lg p-12 text-center">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-100 mb-6">
               <FaEnvelope className="text-indigo-600 text-4xl" />
             </div>
             <p className="text-gray-900 text-xl font-semibold mb-2">
-              No pending invitations
+              No notifications
             </p>
             <p className="text-gray-600">
-              You're all caught up! Check back later for new group invitations.
+              You're all caught up! Check back later for updates.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {invitations.map((invitation, index) => (
+            {notifications.map((notif, index) => (
               <div
-                key={invitation._id}
+                key={notif._id}
                 className="relative overflow-hidden rounded-2xl border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
                 style={{
                   animation: `slideIn 0.5s ease-out ${index * 0.1}s forwards`,
@@ -126,61 +216,76 @@ const Notifications = () => {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-cyan-500/5"></div>
 
-                <div className="relative p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-white">
-                  {/* Invitation Info */}
-                  <div className="flex items-start md:items-center gap-4 flex-1">
-                    <img
-                      src={invitation.sender?.avatar}
-                      alt={invitation.sender?.name}
-                      className="w-16 h-16 rounded-full border-2 border-indigo-300 shadow-md flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Group Invitation
-                      </p>
-                      <p className="text-gray-900 font-semibold mb-2">
-                        <span className="text-indigo-600">
-                          {invitation.sender?.name}
-                        </span>{" "}
-                        invited you to join{" "}
-                        <span className="text-indigo-600">
-                          {invitation.group?.name}
-                        </span>
-                      </p>
-                      <div className="flex flex-wrap gap-3 mt-3 text-sm">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                          {invitation.group?.type === "study"
-                            ? "📚 Study Group"
-                            : "💻 Hackathon"}
-                        </span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-medium capitalize">
-                          {invitation.group?.privacy}
-                        </span>
-                      </div>
-                      <p className="text-gray-600 text-sm mt-3 italic border-l-2 border-indigo-300 pl-3">
-                        "{invitation.group?.goal}"
-                      </p>
-                    </div>
-                  </div>
+                <div className="relative p-6 md:p-8 bg-white flex flex-col gap-6">
+                  <div className="flex flex-col md:flex-row justify-between gap-4">
+                    {/* Notification Info */}
+                    <div className="flex items-start gap-4 flex-1">
+                      <img
+                        src={notif.sender?.avatar || notif.from?.avatar}
+                        alt={notif.sender?.name || notif.from?.name}
+                        className="w-16 h-16 rounded-full border-2 border-indigo-300 shadow-md flex-shrink-0"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                          {getNotificationTitle(notif)}
+                        </p>
+                        <p
+  className={`font-semibold mb-2 ${
+    notif.type === "join_response"
+      ? notif.message.includes("accepted")
+        ? "text-green-700"
+        : "text-red-600"
+      : notif.type === "removed_member"
+      ? "text-red-600"
+      : notif.type === "group_activity"
+      ? "text-indigo-700"
+      : "text-gray-900"
+  }`}
+>
+  {getNotificationMessage(notif)}
+</p>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <button
-                      onClick={() => handleAccept(invitation._id)}
-                      disabled={processedIds.has(invitation._id)}
-                      className="flex-1 md:flex-none flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-md hover:shadow-lg"
-                    >
-                      <FaCheck className="mr-2" />
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => handleDecline(invitation._id)}
-                      disabled={processedIds.has(invitation._id)}
-                      className="flex-1 md:flex-none flex items-center justify-center px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-md hover:shadow-lg"
-                    >
-                      <FaTimes className="mr-2" />
-                      Decline
-                    </button>
+                        {notif.group?.goal && (
+                          <p className="text-gray-600 text-sm mt-3 italic border-l-2 border-indigo-300 pl-3">
+                            "{notif.group?.goal}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex gap-3 items-center">
+                      {!["join_response", "removed_member", "group_activity"].includes(notif.type) && (
+                        <>
+                          <button
+                            onClick={() => handleAccept(notif)}
+                            disabled={processedIds.has(notif._id)}
+                            className="px-5 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50"
+                          >
+                            <FaCheck className="inline mr-2" />
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleDecline(notif)}
+                            disabled={processedIds.has(notif._id)}
+                            className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50"
+                          >
+                            <FaTimes className="inline mr-2" />
+                            Decline
+                          </button>
+                        </>
+                      )}
+
+                      {/* 🗑️ Remove Button */}
+                      <button
+                        onClick={() => handleRemove(notif._id)}
+                        disabled={removingId === notif._id}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
+                      >
+                        <FaTrash className="inline mr-1 text-red-600" />
+                        {removingId === notif._id ? "Removing..." : "Remove"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -189,7 +294,6 @@ const Notifications = () => {
         )}
       </div>
 
-      {/* Keyframe Animation */}
       <style>{`
         @keyframes slideIn {
           from {

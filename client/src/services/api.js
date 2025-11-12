@@ -63,9 +63,34 @@ export const groupAPI = {
     console.log("Making POST request to /groups with data:", data);
     return api.post("/groups", data);
   },
+
   getGroups: () => api.get("/groups"),
+
   getGroupById: (id) => api.get(`/groups/${id}`),
+
   joinGroup: (id) => api.post(`/groups/${id}/join`),
+
+  // Accepts optional search string, fetches /groups/explore with or without search query
+  exploreGroups: (search = "") => {
+    const url = search.trim()
+      ? `/groups/explore?search=${encodeURIComponent(search)}`
+      : "/groups/explore";
+    return api.get(url);
+  },
+
+  requestJoinGroup: (groupId) => api.post(`/groups/${groupId}/join-request`),
+
+  getJoinRequests: (groupId) => api.get(`/groups/${groupId}/join-requests`),
+
+  cancelJoinRequest: (groupId) => api.delete(`/groups/${groupId}/cancel-join-request`),
+  leaveGroup: (groupId) => api.put(`/groups/${groupId}/leave`),
+
+removeMember: (groupId, memberId) =>
+  api.put(`/groups/${groupId}/remove/${memberId}`),
+
+
+  handleJoinRequest: (groupId, userId, action) =>
+    api.put(`/groups/${groupId}/handle-request`, { userId, action }),
 };
 
 // Invitation API
@@ -88,6 +113,13 @@ export const taskAPI = {
     api.put(`/groups/${groupId}/tasks/${taskId}/complete`),
   deleteTask: (groupId, taskId) =>
     api.delete(`/groups/${groupId}/tasks/${taskId}`),
+};
+
+export const notificationAPI = {
+  getNotifications: () => api.get("/notifications"),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  respondNotification: (id, action) =>
+    api.patch(`/notifications/${id}/respond`, { action }),
 };
 
 export const messageAPI = {
