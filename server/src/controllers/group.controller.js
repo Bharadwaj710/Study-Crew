@@ -1,8 +1,11 @@
 import Group from "../models/group.model.js";
 import User from "../models/user.model.js";
 import Invitation from "../models/invitation.model.js";
+
 import Notification from "../models/notification.model.js";
 import mongoose from "mongoose";
+import Task from "../models/task.model.js";
+
 // Create group
 export const createGroup = async (req, res) => {
   try {
@@ -62,8 +65,8 @@ export const createGroup = async (req, res) => {
 // Get all groups
 export const getGroups = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const user = await User.findById(userId).select("joinedGroups");
+    // Fetch user to see what groups they have confirmed membership in
+    const user = await User.findById(req.user.userId).select("joinedGroups");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -511,6 +514,42 @@ export const removeMember = async (req, res) => {
     });
   } catch (error) {
     console.error("Remove member error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+// Delete a group and related tasks/invitations (only creator can delete)
+export const deleteGroup = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    // Only creator may delete
+    if (group.creator.toString() !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "Only the creator can delete this group." });
+    }
+
+    // Delete related tasks
+    await Task.deleteMany({ group: group._id });
+
+    // Delete related invitations
+    await Invitation.deleteMany({ group: group._id });
+
+    // Remove group reference from users' joinedGroups arrays
+    await User.updateMany(
+      { joinedGroups: group._id },
+      { $pull: { joinedGroups: group._id } }
+    );
+
+    // Finally, delete the group itself
+    await Group.findByIdAndDelete(group._id);
+
+    // Optionally emit socket events here (if desired)
+
+    res.json({ message: "Group deleted successfully" });
+  } catch (error) {
+    console.error("deleteGroup error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

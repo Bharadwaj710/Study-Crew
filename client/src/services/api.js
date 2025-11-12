@@ -48,6 +48,14 @@ export const authAPI = {
 export const userAPI = {
   getProfile: () => api.get("/users/profile"),
   updateProfile: (data) => api.put("/users/profile", data),
+  uploadAvatar: (formData) =>
+    api.put("/users/profile/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  // Prefer POST remove endpoint for compatibility; DELETE remains supported on server
+  removeAvatar: () => api.post("/users/profile/avatar/remove"),
+  // Public profile (no auth required endpoint)
+  getById: (id) => api.get(`/users/public/${id}`),
   searchUsers: (search) => api.get(`/users/search?search=${search}`),
   recommendMembers: (skills, interests) =>
     api.get(
@@ -69,7 +77,6 @@ export const groupAPI = {
   getGroupById: (id) => api.get(`/groups/${id}`),
 
   joinGroup: (id) => api.post(`/groups/${id}/join`),
-
   // Accepts optional search string, fetches /groups/explore with or without search query
   exploreGroups: (search = "") => {
     const url = search.trim()
@@ -91,8 +98,10 @@ removeMember: (groupId, memberId) =>
 
   handleJoinRequest: (groupId, userId, action) =>
     api.put(`/groups/${groupId}/handle-request`, { userId, action }),
-};
 
+  deleteGroup: (id) => api.delete(`/groups/${id}`),
+
+};
 // Invitation API
 export const invitationAPI = {
   getInvitations: () => api.get("/invitations"),

@@ -3,6 +3,7 @@ import {
   createGroup,
   getGroups,
   getGroupById,
+  deleteGroup,
   joinGroup,
   exploreGroups,
   requestToJoinGroup,
@@ -35,7 +36,11 @@ router.get("/", protect, getGroups);
 router.post("/:id/join", protect, joinGroup);
 router.get("/:id", protect, getGroupById);
 
-// ✅ TASK ROUTES (nested under groups)
+// Delete group (creator only)
+router.delete("/:id", protect, deleteGroup);
+
+// Task routes - nested under groups
+// Task routes - nested under groups
 router.get("/:groupId/tasks", protect, taskController.getTasks);
 router.get("/:groupId/tasks/:taskId", protect, taskController.getTask);
 router.post("/:groupId/tasks", protect, (req, res) => {

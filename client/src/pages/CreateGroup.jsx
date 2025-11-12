@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
+import { openProfilePopup } from "../hooks/useProfilePopup";
 import { groupAPI, userAPI } from "../services/api";
 
 const CreateGroup = () => {
@@ -314,7 +315,18 @@ const CreateGroup = () => {
                               />
                               <div>
                                 <p className="font-semibold text-gray-900">
-                                  {user.name}
+                                  <button
+                                    onClick={(e) =>
+                                      openProfilePopup(
+                                        user._id,
+                                        e.currentTarget,
+                                        { context: "search" }
+                                      )
+                                    }
+                                    className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+                                  >
+                                    {user.name}
+                                  </button>
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {user.email}
@@ -370,7 +382,18 @@ const CreateGroup = () => {
                             />
                             <div className="flex-1">
                               <p className="font-semibold text-gray-900">
-                                {user.name}
+                                <button
+                                  onClick={(e) =>
+                                    openProfilePopup(
+                                      user._id,
+                                      e.currentTarget,
+                                      { context: "search" }
+                                    )
+                                  }
+                                  className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+                                >
+                                  {user.name}
+                                </button>
                               </p>
                               <p className="text-xs text-gray-500 flex gap-2 flex-wrap">
                                 {user.matchingSkills > 0 && (

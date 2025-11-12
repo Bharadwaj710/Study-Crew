@@ -77,13 +77,30 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Allow components to update the current user (e.g., after avatar upload)
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+    try {
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+    } catch (err) {
+      console.error("Failed to save user to localStorage:", err);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, login, register, logout, isAuthenticated: !!user }}
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        isAuthenticated: !!user,
+        updateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

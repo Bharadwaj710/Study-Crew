@@ -3,6 +3,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import groupRoutes from "./routes/group.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import userPublicRoutes from "./routes/userPublic.routes.js";
 import invitationRoutes from "./routes/invitation.routes.js";
 import progressRoutes from "./routes/progress.routes.js";
 import messageRoutes from "./routes/message.routes.js";
@@ -20,6 +21,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/users", userRoutes);
+// Public user profiles (no auth required)
+app.use("/api/users/public", userPublicRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/progress", progressRoutes);

@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaTimes, FaUserMinus } from "react-icons/fa";
+import {
+  FaTimes,
+  FaUserMinus,
+  FaSearch,
+  FaArrowLeft,
+  FaTrash,
+} from "react-icons/fa";
 import { toast } from "react-toastify";
 import { groupAPI, userAPI } from "../services/api";
+import { openProfilePopup } from "../hooks/useProfilePopup";
+import { useNavigate } from "react-router-dom";
 
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
 const groupId = group?._id;
@@ -25,7 +33,6 @@ useEffect(() => {
       return null;
     }
   };
-
   const currentUserId = getCurrentUserId();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,6 +67,10 @@ const handleRequest = async (userId, action) => {
     toast.error(`Failed to ${action} request`);
   }
 };
+
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
 
   const handleSearch = async () => {
     if (searchQuery.trim().length < 2) return;
@@ -144,7 +155,16 @@ const handleLeaveGroup = async () => {
               alt={group?.creator.name}
               className="w-10 h-10 rounded-full"
             />
-            <span className="text-gray-900 font-semibold">{group?.creator.name}</span>
+            <button
+              onClick={(e) =>
+                openProfilePopup(group?.creator._id, e.currentTarget, {
+                  context: "group",
+                })
+              }
+              className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+            >
+              {group?.creator.name}
+            </button>
           </div>
         </div>
 
@@ -165,7 +185,16 @@ const handleLeaveGroup = async () => {
                     alt={member.name}
                     className="w-8 h-8 rounded-full"
                   />
-                  <span className="text-gray-900 font-medium">{member.name}</span>
+                  <button
+                    onClick={(e) =>
+                      openProfilePopup(member._id, e.currentTarget, {
+                        context: "group",
+                      })
+                    }
+                    className="text-gray-900 font-medium transition-all duration-200 hover:text-indigo-600 hover:drop-shadow-sm cursor-pointer"
+                  >
+                    {member.name}
+                  </button>
                 </div>
                 {isAdmin && member._id !== group.creator._id && (
                   <button
@@ -228,8 +257,60 @@ const handleLeaveGroup = async () => {
 >
   {leaving ? "Leaving..." : "Leave Group"}
 </button>
-
       </div>
+      {/* Confirmation Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !deleting && setShowConfirm(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md z-50 animate-fadeIn">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">
+              Confirm deletion
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete this group? This will permanently
+              remove the group and all related tasks and invitations.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (deleting) return;
+                  setDeleting(true);
+                  try {
+                    await groupAPI.deleteGroup(group._id);
+                    toast.success("Group deleted successfully");
+                    setShowConfirm(false);
+                    onClose && onClose();
+                    // navigate to dashboard
+                    navigate("/dashboard");
+                  } catch (err) {
+                    console.error(err);
+                    const msg =
+                      err?.response?.data?.message || "Failed to delete group";
+                    toast.error(msg);
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                className="px-4 py-2 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 transition-all disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
