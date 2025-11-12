@@ -7,10 +7,15 @@ import {
   FaLightbulb,
   FaCode,
   FaInfoCircle,
+  FaLink,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import { userAPI } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -26,12 +31,24 @@ const Profile = () => {
     },
     interests: [],
     skills: [],
+    links: [],
+    contact: {
+      phone: "",
+      alternateEmail: "",
+      city: "",
+      state: "",
+      country: "",
+    },
   });
   const [newInterest, setNewInterest] = useState("");
   const [newSkill, setNewSkill] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const { updateUser } = useAuth();
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -53,11 +70,31 @@ const Profile = () => {
         },
         interests: response.data.user.interests || [],
         skills: response.data.user.skills || [],
+        links: response.data.user.links || [],
+        contact: response.data.user.contact || {
+          phone: "",
+          alternateEmail: "",
+          city: "",
+          state: "",
+          country: "",
+        },
       });
       setLoading(false);
     } catch (error) {
       toast.error("Failed to load profile");
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSelectedFile(file);
+    try {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } catch (err) {
+      console.error("Failed to create preview URL", err);
     }
   };
 
@@ -102,12 +139,56 @@ const Profile = () => {
     e.preventDefault();
     setSaving(true);
 
+    // Client-side validation for contact fields
     try {
+      const contact = formData.contact || {};
+      if (contact.alternateEmail && contact.alternateEmail.trim() !== "") {
+        const emailVal = contact.alternateEmail.trim();
+        // simple email pattern
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(emailVal)) {
+          toast.error("Please enter a valid alternate email");
+          setSaving(false);
+          return;
+        }
+      }
+      if (contact.phone && contact.phone.trim() !== "") {
+        const digits = contact.phone.replace(/\D/g, "");
+        if (digits.length < 8 || digits.length > 15) {
+          toast.error("Please enter a valid phone number (8-15 digits)");
+          setSaving(false);
+          return;
+        }
+      }
+
+      // If user selected a new avatar file, upload it first
+      if (selectedFile) {
+        try {
+          const fd = new FormData();
+          fd.append("avatar", selectedFile);
+          const uploadRes = await userAPI.uploadAvatar(fd);
+          const updatedUser = uploadRes.data?.user;
+          if (updatedUser) {
+            // Update AuthContext and local UI
+            updateUser(updatedUser);
+            setUser(updatedUser);
+            // clear preview
+            setSelectedFile(null);
+            setPreviewUrl(null);
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to upload avatar");
+          setSaving(false);
+          return;
+        }
+      }
+
       await userAPI.updateProfile(formData);
       toast.success("Profile updated successfully! 🎉");
       fetchProfile();
     } catch (error) {
-      toast.error("Failed to update profile");
+      toast.error(error.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -135,32 +216,108 @@ const Profile = () => {
         {/* Header Card */}
         <div className="relative mb-8 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 rounded-2xl blur-2xl"></div>
-          <div className="relative bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl p-8 md:p-12 shadow-xl">
-            <div className="flex items-center gap-6">
-              <img
-                src={
-                  user?.avatar ||
-                  "https://ui-avatars.com/api/?name=" + user?.name
-                }
-                alt={user?.name}
-                className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
-              />
-              <div className="text-white">
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                  {user?.name}
-                </h1>
-                <p className="text-indigo-100">{user?.email}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {user?.skills?.slice(0, 3).map((skill, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-white/20 text-white"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+          <div className="relative bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl p-6 md:p-10 shadow-xl">
+            <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+              {/* Left: Avatar */}
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <img
+                  src={
+                    previewUrl ||
+                    user?.avatar ||
+                    "https://ui-avatars.com/api/?name=" + user?.name
+                  }
+                  alt={user?.name}
+                  className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl object-cover"
+                />
+
+                {/* On small screens, name sits next to avatar */}
+                <div className="hidden md:block text-white">
+                  <h1 className="text-3xl md:text-4xl font-semibold mb-1">
+                    {user?.name}
+                  </h1>
+                  <p className="text-indigo-100 text-sm">{user?.email}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {user?.skills?.slice(0, 3).map((skill, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-white/20 text-white"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {/* Middle (mobile): name/email displayed under avatar */}
+              <div className="md:hidden text-white w-full">
+                <h1 className="text-2xl font-semibold">{user?.name}</h1>
+                <p className="text-indigo-100 text-sm">{user?.email}</p>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex-shrink-0 w-full md:w-auto flex items-center justify-end gap-3">
+                <input
+                  id="avatarInput"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                <label
+                  htmlFor="avatarInput"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-full shadow-lg cursor-pointer font-semibold hover:scale-[1.02] transition-transform"
+                >
+                  Upload New Image
+                </label>
+
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                    }}
+                    className="px-3 py-2 text-sm text-gray-700 rounded-full bg-white/90 border border-gray-200 hover:bg-white transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm("Remove your avatar and reset to default?"))
+                      return;
+                    setRemoving(true);
+                    try {
+                      const res = await userAPI.removeAvatar();
+                      const updatedUser = res.data?.user;
+                      if (updatedUser) {
+                        updateUser(updatedUser);
+                        setUser(updatedUser);
+                      } else {
+                        setUser((u) => ({ ...u, avatar: "" }));
+                      }
+                      toast.success("Avatar removed");
+                    } catch (err) {
+                      console.error(err);
+                      toast.error("Failed to remove avatar");
+                    } finally {
+                      setRemoving(false);
+                    }
+                  }}
+                  disabled={removing}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-full shadow-sm cursor-pointer hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all disabled:opacity-50 font-semibold"
+                >
+                  {removing ? "Removing..." : "Remove Avatar"}
+                </button>
+              </div>
+            </div>
+            {/* Desktop: show name under avatar area when space allows */}
+            <div className="hidden md:block mt-6 text-white">
+              {/* For larger screens, show the name block aligned under the content when necessary */}
             </div>
           </div>
         </div>
@@ -172,6 +329,7 @@ const Profile = () => {
             { id: "education", label: "Education", icon: FaGraduationCap },
             { id: "interests", label: "Interests", icon: FaLightbulb },
             { id: "skills", label: "Skills", icon: FaCode },
+            { id: "links", label: "Links", icon: FaLink },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -240,6 +398,105 @@ const Profile = () => {
                   rows="4"
                   placeholder="Tell us about yourself and your learning goals..."
                 />
+              </div>
+
+              {/* Contact Information */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
+                  <FaPhone className="text-indigo-600" /> Contact Information
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600">
+                      Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.contact?.phone || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contact: {
+                            ...(formData.contact || {}),
+                            phone: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      placeholder="e.g. +91 9876543210"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600">
+                      Alternate Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.contact?.alternateEmail || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contact: {
+                            ...(formData.contact || {}),
+                            alternateEmail: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      placeholder="e.g. user@domain.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={formData.contact?.city || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          city: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={formData.contact?.state || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          state: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Country"
+                    value={formData.contact?.country || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        contact: {
+                          ...(formData.contact || {}),
+                          country: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -433,6 +690,89 @@ const Profile = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Links Tab */}
+          {activeTab === "links" && (
+            <div className="bg-white rounded-2xl border border-gray-200/50 shadow-lg p-8 space-y-4">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center mb-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-cyan-600 rounded mr-3"></div>
+                Links to Other Profiles
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                Add links to your external profiles (LinkedIn, GitHub, LeetCode,
+                Twitter, project pages, etc.). Use full URLs (including
+                https://).
+              </p>
+
+              <div className="space-y-3">
+                {(formData.links || []).map((link, idx) => (
+                  <div key={idx} className="flex gap-3 items-center">
+                    <input
+                      type="text"
+                      placeholder="Name (e.g., GitHub)"
+                      value={link.name}
+                      onChange={(e) => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links[idx] = {
+                          ...updated.links[idx],
+                          name: e.target.value,
+                        };
+                        setFormData(updated);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+
+                    <input
+                      type="url"
+                      placeholder="https://example.com/you"
+                      value={link.url}
+                      onChange={(e) => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links[idx] = {
+                          ...updated.links[idx],
+                          url: e.target.value,
+                        };
+                        setFormData(updated);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...formData };
+                        updated.links = [...(updated.links || [])];
+                        updated.links.splice(idx, 1);
+                        setFormData(updated);
+                      }}
+                      className="p-2 rounded-md text-gray-500 hover:text-red-600"
+                      aria-label="Remove link"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      links: [...(formData.links || []), { name: "", url: "" }],
+                    })
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-semibold rounded-lg"
+                >
+                  <FaPlus /> Add Link
+                </button>
               </div>
             </div>
           )}

@@ -3,6 +3,7 @@ import { FaPaperPlane } from "react-icons/fa";
 import { FaX } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import { messageAPI } from "../services/api";
+import { openProfilePopup } from "../hooks/useProfilePopup";
 
 const ChatPanel = ({ groupId, socket, onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -78,7 +79,12 @@ const ChatPanel = ({ groupId, socket, onClose }) => {
               />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">
-                  {msg.user.name}
+                  <button
+                    onClick={(e) => openProfilePopup(msg.user._id, e.currentTarget, { context: "chat" })}
+                    className="text-indigo-600 hover:underline font-medium"
+                  >
+                    {msg.user.name}
+                  </button>
                 </p>
                 <p className="text-sm text-gray-700 bg-gray-100 rounded-lg p-2">
                   {msg.text}

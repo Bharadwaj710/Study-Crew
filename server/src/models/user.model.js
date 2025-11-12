@@ -21,9 +21,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "https://ui-avatars.com/api/?background=random",
     },
+    // Cloudinary public id (useful to delete/replace images later)
+    cloudinaryId: {
+      type: String,
+      default: "",
+    },
     about: {
       type: String,
       default: "",
+    },
+    // Links to external profiles (LinkedIn, GitHub, etc.)
+    links: {
+      type: [
+        {
+          name: { type: String, required: true },
+          url: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
+    // Contact information (optional fields)
+    contact: {
+      phone: { type: String, default: "" },
+      alternateEmail: { type: String, default: "" },
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      country: { type: String, default: "" },
     },
     education: {
       college: {
