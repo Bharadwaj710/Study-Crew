@@ -10,7 +10,6 @@ import {
 import { toast } from "react-toastify";
 import { groupAPI, userAPI } from "../services/api";
 import { openProfilePopup } from "../hooks/useProfilePopup";
-import { useNavigate } from "react-router-dom";
 
 const GroupInfoDrawer = ({ group, onClose, onUpdate, onLeave }) => {
 const groupId = group?._id;
