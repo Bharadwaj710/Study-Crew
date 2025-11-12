@@ -10,9 +10,12 @@ export const getPublicProfile = async (req, res) => {
       return res.status(400).json({ message: "Invalid user id" });
     }
 
+    // Include public contact fields (only non-sensitive) and all joined groups with privacy
     const user = await User.findById(id)
-      .select("name avatar about education interests skills links joinedGroups")
-      .populate({ path: "joinedGroups", select: "name type _id", options: { limit: 3 } });
+      .select(
+        "name avatar about education interests skills links contact email joinedGroups"
+      )
+      .populate({ path: "joinedGroups", select: "name privacy _id" });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
