@@ -15,6 +15,7 @@ import {
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import { userAPI } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -44,6 +45,10 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const { updateUser } = useAuth();
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -78,6 +83,18 @@ const Profile = () => {
     } catch (error) {
       toast.error("Failed to load profile");
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSelectedFile(file);
+    try {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } catch (err) {
+      console.error("Failed to create preview URL", err);
     }
   };
 
@@ -144,6 +161,29 @@ const Profile = () => {
         }
       }
 
+      // If user selected a new avatar file, upload it first
+      if (selectedFile) {
+        try {
+          const fd = new FormData();
+          fd.append("avatar", selectedFile);
+          const uploadRes = await userAPI.uploadAvatar(fd);
+          const updatedUser = uploadRes.data?.user;
+          if (updatedUser) {
+            // Update AuthContext and local UI
+            updateUser(updatedUser);
+            setUser(updatedUser);
+            // clear preview
+            setSelectedFile(null);
+            setPreviewUrl(null);
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to upload avatar");
+          setSaving(false);
+          return;
+        }
+      }
+
       await userAPI.updateProfile(formData);
       toast.success("Profile updated successfully! 🎉");
       fetchProfile();
@@ -176,32 +216,108 @@ const Profile = () => {
         {/* Header Card */}
         <div className="relative mb-8 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 rounded-2xl blur-2xl"></div>
-          <div className="relative bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl p-8 md:p-12 shadow-xl">
-            <div className="flex items-center gap-6">
-              <img
-                src={
-                  user?.avatar ||
-                  "https://ui-avatars.com/api/?name=" + user?.name
-                }
-                alt={user?.name}
-                className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
-              />
-              <div className="text-white">
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                  {user?.name}
-                </h1>
-                <p className="text-indigo-100">{user?.email}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {user?.skills?.slice(0, 3).map((skill, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-white/20 text-white"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+          <div className="relative bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl p-6 md:p-10 shadow-xl">
+            <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+              {/* Left: Avatar */}
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <img
+                  src={
+                    previewUrl ||
+                    user?.avatar ||
+                    "https://ui-avatars.com/api/?name=" + user?.name
+                  }
+                  alt={user?.name}
+                  className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl object-cover"
+                />
+
+                {/* On small screens, name sits next to avatar */}
+                <div className="hidden md:block text-white">
+                  <h1 className="text-3xl md:text-4xl font-semibold mb-1">
+                    {user?.name}
+                  </h1>
+                  <p className="text-indigo-100 text-sm">{user?.email}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {user?.skills?.slice(0, 3).map((skill, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-white/20 text-white"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {/* Middle (mobile): name/email displayed under avatar */}
+              <div className="md:hidden text-white w-full">
+                <h1 className="text-2xl font-semibold">{user?.name}</h1>
+                <p className="text-indigo-100 text-sm">{user?.email}</p>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex-shrink-0 w-full md:w-auto flex items-center justify-end gap-3">
+                <input
+                  id="avatarInput"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                <label
+                  htmlFor="avatarInput"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-full shadow-lg cursor-pointer font-semibold hover:scale-[1.02] transition-transform"
+                >
+                  Upload New Image
+                </label>
+
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                    }}
+                    className="px-3 py-2 text-sm text-gray-700 rounded-full bg-white/90 border border-gray-200 hover:bg-white transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm("Remove your avatar and reset to default?"))
+                      return;
+                    setRemoving(true);
+                    try {
+                      const res = await userAPI.removeAvatar();
+                      const updatedUser = res.data?.user;
+                      if (updatedUser) {
+                        updateUser(updatedUser);
+                        setUser(updatedUser);
+                      } else {
+                        setUser((u) => ({ ...u, avatar: "" }));
+                      }
+                      toast.success("Avatar removed");
+                    } catch (err) {
+                      console.error(err);
+                      toast.error("Failed to remove avatar");
+                    } finally {
+                      setRemoving(false);
+                    }
+                  }}
+                  disabled={removing}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-full shadow-sm cursor-pointer hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 transition-all disabled:opacity-50 font-semibold"
+                >
+                  {removing ? "Removing..." : "Remove Avatar"}
+                </button>
+              </div>
+            </div>
+            {/* Desktop: show name under avatar area when space allows */}
+            <div className="hidden md:block mt-6 text-white">
+              {/* For larger screens, show the name block aligned under the content when necessary */}
             </div>
           </div>
         </div>

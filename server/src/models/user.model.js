@@ -21,6 +21,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "https://ui-avatars.com/api/?background=random",
     },
+    // Cloudinary public id (useful to delete/replace images later)
+    cloudinaryId: {
+      type: String,
+      default: "",
+    },
     about: {
       type: String,
       default: "",

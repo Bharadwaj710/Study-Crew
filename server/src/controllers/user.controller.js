@@ -1,5 +1,10 @@
 import User from "../models/user.model.js";
 import validator from "validator";
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  removeLocalFile,
+} from "../utils/uploadImage.js";
 // Get current user profile
 export const getProfile = async (req, res) => {
   try {
@@ -192,6 +197,92 @@ export const recommendMembers = async (req, res) => {
       message: "Recommendations based on skills and interests match",
     });
   } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Upload avatar and save to user profile
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      // cleanup temp file
+      removeLocalFile(req.file.path);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // If user already had an image uploaded to Cloudinary, remove it
+    if (user.cloudinaryId) {
+      try {
+        await deleteFromCloudinary(user.cloudinaryId);
+      } catch (err) {
+        // log and continue
+        console.error(
+          "Failed to delete previous Cloudinary image:",
+          err.message || err
+        );
+      }
+    }
+
+    // Upload new file
+    const { url, public_id } = await uploadToCloudinary(
+      req.file.path,
+      "studycrew/avatars"
+    );
+
+    user.avatar = url;
+    user.cloudinaryId = public_id;
+    await user.save();
+
+    // remove local temp file
+    removeLocalFile(req.file.path);
+
+    res.json({
+      avatarUrl: url,
+      user: { ...user.toObject(), password: undefined },
+    });
+  } catch (error) {
+    // try to clean temp file
+    if (req.file && req.file.path) removeLocalFile(req.file.path);
+    console.error("uploadAvatar error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Remove avatar: delete Cloudinary image (if any) and reset user's avatar to default (ui-avatars)
+export const removeAvatar = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // If there is a cloudinary image stored, delete it
+    if (user.cloudinaryId) {
+      try {
+        await deleteFromCloudinary(user.cloudinaryId);
+      } catch (err) {
+        console.error(
+          "Failed to delete Cloudinary image during removeAvatar:",
+          err.message || err
+        );
+      }
+    }
+
+    // Reset avatar - leave UI to fallback by using empty string or ui-avatars URL
+    user.avatar = ""; // frontend will fallback to ui-avatars using the user's name
+    user.cloudinaryId = "";
+    await user.save();
+
+    res.json({
+      message: "Avatar removed",
+      avatarUrl: user.avatar,
+      user: { ...user.toObject(), password: undefined },
+    });
+  } catch (error) {
+    console.error("removeAvatar error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
