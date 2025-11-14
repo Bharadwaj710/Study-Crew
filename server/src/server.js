@@ -11,7 +11,15 @@ async function start() {
     await connectDB();
 
     const server = http.createServer(app);
-    const io = new Server(server, { cors: { origin: "*" } });
+    const FRONTEND_URL = process.env.FRONTEND_URL || "*";
+    const io = new Server(server, {
+      cors: {
+        origin: FRONTEND_URL,
+        methods: ["GET", "POST"],
+        credentials: true,
+      },
+      pingTimeout: 60000,
+    });
 
     // Setup sockets **after io is created**
     setupChatSocket(io);

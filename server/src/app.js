@@ -7,6 +7,7 @@ import userPublicRoutes from "./routes/userPublic.routes.js";
 import invitationRoutes from "./routes/invitation.routes.js";
 import progressRoutes from "./routes/progress.routes.js";
 import messageRoutes from "./routes/message.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import taskRoutes from "./routes/task.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
@@ -26,7 +27,9 @@ app.use("/api/users/public", userPublicRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/progress", progressRoutes);
-app.use("/api/messages", messageRoutes);
+// Mount message routes at /api so endpoints like /api/groups/:groupId/messages work
+app.use("/api", messageRoutes);
+app.use("/api", uploadRoutes);
 //app.use("/api/groups", taskRoutes);
 
 // Health check

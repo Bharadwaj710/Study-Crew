@@ -89,18 +89,17 @@ export const groupAPI = {
 
   getJoinRequests: (groupId) => api.get(`/groups/${groupId}/join-requests`),
 
-  cancelJoinRequest: (groupId) => api.delete(`/groups/${groupId}/cancel-join-request`),
+  cancelJoinRequest: (groupId) =>
+    api.delete(`/groups/${groupId}/cancel-join-request`),
   leaveGroup: (groupId) => api.put(`/groups/${groupId}/leave`),
 
-removeMember: (groupId, memberId) =>
-  api.put(`/groups/${groupId}/remove/${memberId}`),
-
+  removeMember: (groupId, memberId) =>
+    api.put(`/groups/${groupId}/remove/${memberId}`),
 
   handleJoinRequest: (groupId, userId, action) =>
     api.put(`/groups/${groupId}/handle-request`, { userId, action }),
 
   deleteGroup: (id) => api.delete(`/groups/${id}`),
-
 };
 // Invitation API
 export const invitationAPI = {
@@ -132,10 +131,29 @@ export const notificationAPI = {
 };
 
 export const messageAPI = {
-  getMessages: (groupId, limit = 50) =>
-    api.get(`/groups/${groupId}/messages?limit=${limit}`),
-  sendMessage: (groupId, text) =>
-    api.post(`/groups/${groupId}/messages`, { text }),
+  getMessages: (groupId, limit = 50, before = null) => {
+    let url = `/groups/${groupId}/messages?limit=${limit}`;
+    if (before) {
+      url += `&before=${before}`;
+    }
+    return api.get(url);
+  },
+  createMessage: (groupId, messageData) =>
+    api.post(`/groups/${groupId}/messages`, messageData),
+  editMessage: (messageId, text) => api.put(`/messages/${messageId}`, { text }),
+  deleteMessage: (messageId) => api.delete(`/messages/${messageId}`),
+};
+
+// Upload API
+export const uploadAPI = {
+  uploadFile: (formData) =>
+    api.post("/uploads", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  uploadAvatar: (formData) =>
+    api.post("/uploads/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 };
 
 export default api;

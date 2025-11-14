@@ -5,6 +5,7 @@ import Invitation from "../models/invitation.model.js";
 import Notification from "../models/notification.model.js";
 import mongoose from "mongoose";
 import Task from "../models/task.model.js";
+import Message from "../models/message.model.js";
 
 // Create group
 export const createGroup = async (req, res) => {
@@ -89,7 +90,8 @@ export const getGroups = async (req, res) => {
     const groupsWithStatus = groups.map((group) => {
       // Check if user has pending join request
       const hasJoinRequestPending = group.joinRequests.some(
-        (jr) => jr.user.toString() === userId.toString() && jr.status === "pending"
+        (jr) =>
+          jr.user.toString() === userId.toString() && jr.status === "pending"
       );
 
       // Check if in pending invites
@@ -119,21 +121,25 @@ export const getGroupById = async (req, res) => {
 
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    const isMember = group.members.some(m => m._id.toString() === userId);
+    const isMember = group.members.some((m) => m._id.toString() === userId);
     const hasPendingJoinRequest = group.joinRequests.some(
-      jr => jr.user.toString() === userId && jr.status === "pending"
+      (jr) => jr.user.toString() === userId && jr.status === "pending"
     );
     const hasPendingInvite = group.pendingInvites.some(
-      i => i.toString() === userId
+      (i) => i.toString() === userId
     );
 
     // Deny access to any user who is not a member and has pending join request or invite
     if (!isMember) {
       if (hasPendingJoinRequest || hasPendingInvite) {
-        return res.status(403).json({ message: "Your request/invitation is pending approval." });
+        return res
+          .status(403)
+          .json({ message: "Your request/invitation is pending approval." });
       }
       if (group.privacy === "private") {
-        return res.status(403).json({ message: "You do not have access to this private group." });
+        return res
+          .status(403)
+          .json({ message: "You do not have access to this private group." });
       }
     }
 
@@ -142,7 +148,6 @@ export const getGroupById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 // Join group
 export const joinGroup = async (req, res) => {
@@ -222,24 +227,24 @@ export const exploreGroups = async (req, res) => {
           members: 1,
           pendingInvites: 1,
           joinRequests: 1,
-         requested: {
-  $in: [
-    new mongoose.Types.ObjectId(userId),
-    {
-      $map: {
-        input: {
-          $filter: {
-            input: { $ifNull: ["$joinRequests", []] },
-            as: "jr",
-            cond: { $eq: ["$$jr.status", "pending"] }
-          }
-        },
-        as: "jr",
-        in: "$$jr.user"
-      }
-    }
-  ]
-}
+          requested: {
+            $in: [
+              new mongoose.Types.ObjectId(userId),
+              {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: { $ifNull: ["$joinRequests", []] },
+                      as: "jr",
+                      cond: { $eq: ["$$jr.status", "pending"] },
+                    },
+                  },
+                  as: "jr",
+                  in: "$$jr.user",
+                },
+              },
+            ],
+          },
         },
       },
     ]);
@@ -247,7 +252,9 @@ export const exploreGroups = async (req, res) => {
     res.json({ groups });
   } catch (error) {
     console.error("Explore groups search error:", error);
-    res.status(500).json({ message: "Server error fetching groups", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Server error fetching groups", error: error.message });
   }
 };
 
@@ -278,13 +285,17 @@ export const requestToJoinGroup = async (req, res) => {
     await group.save();
 
     // Notify creator
-    const requester = await User.findById(req.user.userId).select("name avatar");
+    const requester = await User.findById(req.user.userId).select(
+      "name avatar"
+    );
     await Notification.create({
       to: group.creator,
       from: req.user.userId,
       group: group._id,
       type: "join_request",
-      message: `${requester?.name || "Someone"} requested to join your group "${group.name}".`,
+      message: `${requester?.name || "Someone"} requested to join your group "${
+        group.name
+      }".`,
     });
 
     res.json({ message: "Join request sent" });
@@ -304,7 +315,8 @@ export const listJoinRequests = async (req, res) => {
       });
 
     if (!group) return res.status(404).json({ message: "Group not found" });
-    if (group.creator.toString() !== req.user.userId) return res.status(403).json({ message: "Not authorized" });
+    if (group.creator.toString() !== req.user.userId)
+      return res.status(403).json({ message: "Not authorized" });
 
     // Filter joinRequests to only pending ones before sending response
     const pendingJoinRequests = group.joinRequests.filter(
@@ -348,7 +360,7 @@ export const handleJoinRequest = async (req, res) => {
     // ✅ Delete or update the original join_request notification
     await Notification.deleteMany({
       to: req.user.userId, // the creator who received the join request
-      from: userId,        // the requester
+      from: userId, // the requester
       group: group._id,
       type: "join_request",
     });
@@ -393,7 +405,8 @@ export const cancelJoinRequest = async (req, res) => {
     // Remove the join request for this user
     const initialLength = group.joinRequests.length;
     group.joinRequests = group.joinRequests.filter(
-      jr => jr.user.toString() !== userId.toString() || jr.status !== "pending"
+      (jr) =>
+        jr.user.toString() !== userId.toString() || jr.status !== "pending"
     );
 
     if (group.joinRequests.length === initialLength) {
@@ -430,16 +443,24 @@ export const leaveGroup = async (req, res) => {
     if (!group) return res.status(404).json({ message: "Group not found" });
 
     if (group.creator.toString() === userId) {
-      return res.status(400).json({ message: "Group creator cannot leave their own group" });
+      return res
+        .status(400)
+        .json({ message: "Group creator cannot leave their own group" });
     }
 
-    group.members = group.members.filter(m => m.toString() !== userId);
+    group.members = group.members.filter((m) => m.toString() !== userId);
     await group.save();
 
-    await User.findByIdAndUpdate(userId, { $pull: { joinedGroups: group._id } });
+    await User.findByIdAndUpdate(userId, {
+      $pull: { joinedGroups: group._id },
+    });
 
     const member = await User.findById(userId).select("name username email");
-    const displayName = member?.name || member?.username || member?.email?.split("@")[0] || "A member";
+    const displayName =
+      member?.name ||
+      member?.username ||
+      member?.email?.split("@")[0] ||
+      "A member";
 
     await Notification.create({
       to: group.creator,
@@ -450,7 +471,9 @@ export const leaveGroup = async (req, res) => {
       status: "unread",
     });
 
-    return res.status(200).json({ message: "You have left the group successfully." });
+    return res
+      .status(200)
+      .json({ message: "You have left the group successfully." });
   } catch (error) {
     console.error("Leave group error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -503,6 +526,23 @@ export const removeMember = async (req, res) => {
       .populate("creator", "name avatar")
       .populate("members", "name avatar");
 
+    // Emit room members updated via Socket.IO if available
+    const io = req.app?.get("io");
+    if (io) {
+      const members = updatedGroup.members.map((m) => ({
+        _id: m._id,
+        name: m.name,
+        avatar: m.avatar,
+      }));
+      const admins = [updatedGroup.creator._id.toString()];
+
+      io.to(groupId).emit("roomMembersUpdated", {
+        groupId,
+        members,
+        admins,
+      });
+    }
+
     res.json({
       message: "Member removed successfully",
       group: updatedGroup,
@@ -512,7 +552,7 @@ export const removeMember = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-// Delete a group and related tasks/invitations (only creator can delete)
+// Delete a group and related tasks/invitations/messages (only creator can delete)
 export const deleteGroup = async (req, res) => {
   try {
     const group = await Group.findById(req.params.id);
@@ -531,6 +571,10 @@ export const deleteGroup = async (req, res) => {
     // Delete related invitations
     await Invitation.deleteMany({ group: group._id });
 
+    // Delete related messages (cascade delete)
+    await Message.deleteMany({ groupId: group._id });
+    console.log(`Deleted all messages for group ${group._id}`);
+
     // Remove group reference from users' joinedGroups arrays
     await User.updateMany(
       { joinedGroups: group._id },
@@ -540,7 +584,13 @@ export const deleteGroup = async (req, res) => {
     // Finally, delete the group itself
     await Group.findByIdAndDelete(group._id);
 
-    // Optionally emit socket events here (if desired)
+    // Emit socket event to notify connected clients
+    const io = req.app?.get("io");
+    if (io) {
+      io.to(group._id.toString()).emit("groupDeleted", {
+        groupId: group._id,
+      });
+    }
 
     res.json({ message: "Group deleted successfully" });
   } catch (error) {

@@ -6,11 +6,16 @@ const router = express.Router({ mergeParams: true });
 
 router.use(protect);
 
-router.get("/:groupId/messages", messageController.getMessages);
+// Get messages for a group with pagination
+router.get("/groups/:groupId/messages", messageController.getMessages);
 
-router.post("/:groupId/messages", (req, res) => {
-  const io = req.app.get("io");
-  messageController.createMessage(req, res, io);
-});
+// Create message (REST fallback)
+router.post("/groups/:groupId/messages", messageController.createMessage);
+
+// Edit message
+router.put("/messages/:messageId", messageController.editMessage);
+
+// Delete message
+router.delete("/messages/:messageId", messageController.deleteMessage);
 
 export default router;
