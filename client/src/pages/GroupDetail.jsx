@@ -9,7 +9,7 @@ import TaskModal from "../components/TaskModal";
 import TaskEditModal from "../components/TaskEditModal";
 import TaskProgressModal from "../components/TaskProgressModal";
 import GroupInfoDrawer from "../components/GroupInfoDrawer";
-import ChatPanel from "../components/ChatPanel";
+import ChatModal from "../components/ChatModal";
 import { groupAPI, taskAPI } from "../services/api";
 
 const GroupDetail = () => {
@@ -36,6 +36,7 @@ const GroupDetail = () => {
     }
   };
   const currentUserId = getCurrentUserId();
+  const token = localStorage.getItem("token");
 
   // Initialize socket and fetch data
   useEffect(() => {
@@ -168,17 +169,9 @@ const GroupDetail = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Navbar />
 
-      <div
-        className={`flex transition-all duration-300 ${
-          isChatOpen ? "gap-0" : ""
-        }`}
-      >
+      <div className={`flex transition-all duration-300`}>
         {/* Main content */}
-        <div
-          className={`transition-all duration-300 ${
-            isChatOpen ? "w-1/2" : "w-full"
-          }`}
-        >
+        <div className={`transition-all duration-300 w-full`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
@@ -276,41 +269,43 @@ const GroupDetail = () => {
           </div>
         </div>
 
-        {/* Chat panel */}
-        {isChatOpen && (
-          <div className="w-1/2 border-l border-gray-200 bg-white shadow-lg">
-            <ChatPanel
-              groupId={id}
-              socket={socket}
-              onClose={() => setIsChatOpen(false)}
-            />
-          </div>
+        {/* Chat modal opens over the UI */}
+        {isChatOpen && group && (
+          <ChatModal
+            group={group}
+            onClose={() => setIsChatOpen(false)}
+            currentUserId={currentUserId}
+            token={token}
+          />
         )}
       </div>
 
-      {/* Floating chat button */}
+      {/* Floating chat button (FAB) */}
       <button
         onClick={() => setIsChatOpen(!isChatOpen)}
-        className="fixed bottom-8 left-8 w-14 h-14 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center hover:scale-110"
+        aria-label="Open chat"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white rounded-full shadow-2xl hover:shadow-2xl/40 transition-transform transform-gpu hover:scale-105 z-50 flex items-center justify-center"
         title="Toggle chat"
       >
-        <FaComments className="text-xl" />
+        {/* soft halo */}
+        <span className="absolute inset-0 rounded-full bg-white/5 opacity-0 hover:opacity-30 transition-opacity" />
+        <FaComments className="text-2xl drop-shadow" />
       </button>
 
       {/* Modals */}
       {isTaskModalOpen && (
-       <TaskModal
-  groupId={id}
-  group={group}
-  onClose={() => setIsTaskModalOpen(false)}
-  socket={socket}
-  onTaskCreated={(task) =>
-    setTasks((prev) => {
-      if (prev.some((t) => t._id === task._id)) return prev;
-      return [task, ...prev];
-    })
-  }
-/>
+        <TaskModal
+          groupId={id}
+          group={group}
+          onClose={() => setIsTaskModalOpen(false)}
+          socket={socket}
+          onTaskCreated={(task) =>
+            setTasks((prev) => {
+              if (prev.some((t) => t._id === task._id)) return prev;
+              return [task, ...prev];
+            })
+          }
+        />
       )}
 
       {editingTask && (
